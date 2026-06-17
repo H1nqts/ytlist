@@ -1,11 +1,18 @@
-import type { Playlist, Track } from "@/types"
-import { avatarFor, thumbFor } from "@/data/mock-playlists"
+import type { Track } from "@/types"
 
 // ---------------------------------------------------------------------------
-// Fabricate playlists from a pasted link. There is no real YouTube parsing —
-// these helpers simulate a successful fetch (or surface an error) so the UI's
-// loading / success / error paths can all be exercised.
+// Fabricate track lists for playlists. The backend doesn't return tracks yet,
+// so these helpers stand in for real track data. (Seed playlists were removed —
+// the library now starts empty and is populated from the backend.)
 // ---------------------------------------------------------------------------
+
+function thumbFor(seed: string): string {
+  return `https://picsum.photos/seed/${seed}/320/180`
+}
+
+function avatarFor(seed: string): string {
+  return `https://picsum.photos/seed/${seed}-ch/80/80`
+}
 
 /**
  * Returns true for links that should fail the (mock) fetch:
@@ -31,16 +38,6 @@ export function fetchErrorFor(url: string): string {
   return "Couldn't fetch this playlist"
 }
 
-const TITLE_WORDS = [
-  "Vibes",
-  "Mix",
-  "Sessions",
-  "Collection",
-  "Favorites",
-  "Radio",
-  "Essentials",
-  "Picks",
-]
 const CHANNELS = [
   "Topic",
   "Vevo",
@@ -86,15 +83,19 @@ function seededInt(seed: string, salt: number, max: number): number {
 }
 
 /**
- * Build a fresh playlist for a (presumed valid) link. The number and content
- * of tracks is derived deterministically from the url.
+ * Build a stand-in track list for a playlist. The number and content of tracks
+ * is derived deterministically from the playlist id + url, so it's stable
+ * across renders until the backend starts returning real tracks.
  */
-export function createPlaylistFromUrl(url: string, createdAt: number): Playlist {
-  const id = `pl-${createdAt.toString(36)}`
+export function mockTracksForPlaylist(
+  playlistId: string,
+  url: string,
+  createdAt: number
+): Track[] {
   const trackCount = 8 + seededInt(url, 7, 10) // 8..17
 
-  const tracks: Track[] = Array.from({ length: trackCount }, (_, i) => {
-    const tid = `${id}-t${i + 1}`
+  return Array.from({ length: trackCount }, (_, i) => {
+    const tid = `${playlistId}-t${i + 1}`
     const titleIdx = seededInt(url + i, 3, SAMPLE_TITLES.length)
     const channelIdx = seededInt(url + i, 11, CHANNELS.length)
     const channel = CHANNELS[channelIdx]
@@ -102,26 +103,13 @@ export function createPlaylistFromUrl(url: string, createdAt: number): Playlist 
       id: tid,
       title: SAMPLE_TITLES[(titleIdx + i) % SAMPLE_TITLES.length],
       channel,
-      channelAvatarUrl: avatarFor(`${id}-${channel}`),
+      channelAvatarUrl: avatarFor(`${playlistId}-${channel}`),
       thumbnailUrl: thumbFor(tid),
       durationSec: 150 + seededInt(url + i, 5, 230), // 150..379
       views: 5_000 + seededInt(url + i, 13, 50_000_000),
       addedAt: new Date(createdAt - (trackCount - i) * 60_000).toISOString(),
     }
   })
-
-  const word = TITLE_WORDS[seededInt(url, 17, TITLE_WORDS.length)]
-  const isoNow = new Date(createdAt).toISOString()
-
-  return {
-    id,
-    title: `Imported ${word}`,
-    sourceUrl: url.trim(),
-    thumbnailUrl: thumbFor(`${id}-cover`),
-    tracks,
-    status: "idle",
-    lastSyncedAt: isoNow,
-  }
 }
 
 /** Re-fetch produces a slightly different track set, simulating an updated source. */

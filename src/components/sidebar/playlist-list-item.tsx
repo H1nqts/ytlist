@@ -56,8 +56,9 @@ export function PlaylistListItem({ playlist, active }: PlaylistListItemProps) {
   function commitRename() {
     const next = draftTitle.trim()
     if (next && next !== playlist.title) {
+      // Success/error feedback is handled in renamePlaylist (it knows the
+      // backend result).
       renamePlaylist(playlist.id, next)
-      toast.success("Playlist renamed")
     }
     setRenaming(false)
   }
@@ -205,9 +206,9 @@ export function PlaylistListItem({ playlist, active }: PlaylistListItemProps) {
             <Button
               variant="destructive"
               onClick={() => {
+                // Success/error feedback is handled in deletePlaylist.
                 deletePlaylist(playlist.id)
                 setConfirmOpen(false)
-                toast.success("Removed from library")
               }}
             >
               <Trash2Icon />

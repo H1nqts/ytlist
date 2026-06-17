@@ -1,4 +1,5 @@
 import * as React from "react"
+import { toast } from "sonner"
 
 import type { LibraryState, Playlist, Track } from "@/types"
 import {
@@ -6,11 +7,17 @@ import {
   libraryReducer,
 } from "@/state/library-reducer"
 import {
-  createPlaylistFromUrl,
   fetchErrorFor,
   isLikelyInvalidUrl,
   refetchTracks,
 } from "@/data/mock-helpers"
+import {
+  playlistAdd,
+  playlistDelete,
+  playlistGetAll,
+  playlistRename,
+  toUiPlaylist,
+} from "@/lib/api"
 
 interface LibraryContextValue {
   state: LibraryState
@@ -62,6 +69,27 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  // Reload the full playlist set from the backend (source of truth).
+  const reloadPlaylists = React.useCallback(async () => {
+    const rows = await playlistGetAll()
+    dispatch({ type: "SET_PLAYLISTS", playlists: rows.map(toUiPlaylist) })
+  }, [])
+
+  // Load saved playlists from the backend once on mount.
+  React.useEffect(() => {
+    let cancelled = false
+    reloadPlaylists().catch((err) => {
+      if (cancelled) return
+      console.error("Failed to load playlists", err)
+      toast.error("Couldn't load your playlists", {
+        description: String(err),
+      })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [reloadPlaylists])
+
   const runDeferred = React.useCallback((fn: () => void) => {
     const id = setTimeout(() => {
       timers.current.delete(id)
@@ -70,46 +98,42 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     timers.current.add(id)
   }, [])
 
-  const addPlaylist = React.useCallback(
-    (url: string) => {
-      const createdAt = Date.now()
-      const tempId = `pl-${createdAt.toString(36)}`
-      const isInvalid = isLikelyInvalidUrl(url)
+  const addPlaylist = React.useCallback((url: string) => {
+    const createdAt = Date.now()
+    // Client-only id for the loading row; replaced by the real backend id on success.
+    const tempId = `tmp-${createdAt.toString(36)}`
+    const trimmed = url.trim()
 
-      // Insert a loading placeholder immediately so the spinner shows.
-      const placeholder: Playlist = {
-        id: tempId,
-        title: "New playlist",
-        sourceUrl: url.trim(),
-        thumbnailUrl: "",
-        tracks: [],
-        status: "loading",
-        loadingKind: "fetch",
-        lastSyncedAt: new Date(createdAt).toISOString(),
-      }
-      dispatch({ type: "ADD_PLAYLIST", playlist: placeholder })
+    // Insert a loading placeholder immediately so the spinner shows.
+    const placeholder: Playlist = {
+      id: tempId,
+      title: "New playlist",
+      sourceUrl: trimmed,
+      thumbnailUrl: "",
+      tracks: [],
+      status: "loading",
+      loadingKind: "fetch",
+      lastSyncedAt: new Date(createdAt).toISOString(),
+    }
+    dispatch({ type: "ADD_PLAYLIST", playlist: placeholder })
 
-      runDeferred(() => {
-        if (isInvalid) {
-          dispatch({
-            type: "FETCH_ERROR",
-            playlistId: tempId,
-            message: fetchErrorFor(url),
-          })
-          return
-        }
-        const built = createPlaylistFromUrl(url, createdAt)
+    playlistAdd(trimmed)
+      .then((row) => {
         dispatch({
-          type: "FETCH_SUCCESS",
-          playlistId: tempId,
-          tracks: built.tracks,
-          syncedAt: built.lastSyncedAt,
-          title: built.title,
+          type: "REPLACE_PLAYLIST",
+          placeholderId: tempId,
+          playlist: toUiPlaylist(row),
         })
       })
-    },
-    [runDeferred]
-  )
+      .catch((err) => {
+        dispatch({
+          type: "FETCH_ERROR",
+          playlistId: tempId,
+          message: String(err),
+        })
+        toast.error("Couldn't save this playlist", { description: String(err) })
+      })
+  }, [])
 
   const fetchPlaylist = React.useCallback(
     (playlistId: string) => {
@@ -158,13 +182,59 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
   )
 
   const deletePlaylist = React.useCallback(
-    (playlistId: string) => dispatch({ type: "DELETE_PLAYLIST", playlistId }),
-    []
+    (playlistId: string) => {
+      // Optimistically remove from the UI.
+      dispatch({ type: "DELETE_PLAYLIST", playlistId })
+
+      // Mock/seed rows (string ids) live only in memory.
+      const numericId = Number(playlistId)
+      if (!Number.isInteger(numericId)) {
+        toast.success("Removed from library")
+        return
+      }
+
+      playlistDelete(numericId)
+        .then(() => {
+          toast.success("Removed from library")
+        })
+        .catch((err) => {
+          // Restore from the backend (it still has the row) and report.
+          reloadPlaylists().catch(() => {})
+          toast.error("Couldn't delete playlist", { description: String(err) })
+        })
+    },
+    [reloadPlaylists]
   )
   const renamePlaylist = React.useCallback(
-    (playlistId: string, title: string) =>
-      dispatch({ type: "RENAME_PLAYLIST", playlistId, title }),
-    []
+    (playlistId: string, title: string) => {
+      // Optimistically update the UI, then persist via the backend command.
+      const previous =
+        state.playlists.find((p) => p.id === playlistId)?.title ?? title
+      dispatch({ type: "RENAME_PLAYLIST", playlistId, title })
+
+      // Only call the backend for real (numeric-id) playlists; mock/seed rows
+      // use string ids and live purely in memory.
+      const numericId = Number(playlistId)
+      if (!Number.isInteger(numericId)) {
+        toast.success("Playlist renamed")
+        return
+      }
+
+      playlistRename(numericId, title)
+        .then((row) => {
+          // Reconcile with whatever the backend stored (it's the source of truth).
+          if (row.name !== title) {
+            dispatch({ type: "RENAME_PLAYLIST", playlistId, title: row.name })
+          }
+          toast.success("Playlist renamed")
+        })
+        .catch((err) => {
+          // Roll back on failure and surface the error.
+          dispatch({ type: "RENAME_PLAYLIST", playlistId, title: previous })
+          toast.error("Couldn't rename playlist", { description: String(err) })
+        })
+    },
+    [state.playlists]
   )
   const selectPlaylist = React.useCallback(
     (playlistId: string) => dispatch({ type: "SELECT_PLAYLIST", playlistId }),

@@ -1,8 +1,9 @@
 import type { LibraryState, Playlist, Track } from "@/types"
-import { MOCK_PLAYLISTS } from "@/data/mock-playlists"
 
 export type LibraryAction =
+  | { type: "SET_PLAYLISTS"; playlists: Playlist[] }
   | { type: "ADD_PLAYLIST"; playlist: Playlist }
+  | { type: "REPLACE_PLAYLIST"; placeholderId: string; playlist: Playlist }
   | { type: "START_FETCH"; playlistId: string }
   | { type: "START_REFRESH"; playlistId: string }
   | {
@@ -19,8 +20,9 @@ export type LibraryAction =
   | { type: "SET_SEARCH"; search: string }
 
 export const initialLibraryState: LibraryState = {
-  playlists: MOCK_PLAYLISTS,
-  selectedPlaylistId: MOCK_PLAYLISTS[0]?.id ?? null,
+  // Real playlists are loaded from the backend on mount (SET_PLAYLISTS).
+  playlists: [],
+  selectedPlaylistId: null,
   search: "",
 }
 
@@ -37,6 +39,17 @@ export function libraryReducer(
   action: LibraryAction
 ): LibraryState {
   switch (action.type) {
+    case "SET_PLAYLISTS":
+      return {
+        ...state,
+        playlists: action.playlists,
+        // Keep the current selection if it still exists, else select the first.
+        selectedPlaylistId:
+          action.playlists.find((p) => p.id === state.selectedPlaylistId)?.id ??
+          action.playlists[0]?.id ??
+          null,
+      }
+
     case "ADD_PLAYLIST":
       return {
         ...state,
@@ -44,6 +57,19 @@ export function libraryReducer(
         selectedPlaylistId: action.playlist.id,
         search: "",
       }
+
+    case "REPLACE_PLAYLIST": {
+      const wasSelected = state.selectedPlaylistId === action.placeholderId
+      return {
+        ...state,
+        playlists: state.playlists.map((p) =>
+          p.id === action.placeholderId ? action.playlist : p
+        ),
+        selectedPlaylistId: wasSelected
+          ? action.playlist.id
+          : state.selectedPlaylistId,
+      }
+    }
 
     case "START_FETCH":
       return {
