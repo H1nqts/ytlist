@@ -2,6 +2,7 @@ import type { LibraryState, Playlist, Track } from "@/types"
 
 export type LibraryAction =
   | { type: "SET_PLAYLISTS"; playlists: Playlist[] }
+  | { type: "INITIAL_LOAD_FAILED" }
   | { type: "ADD_PLAYLIST"; playlist: Playlist }
   | { type: "REPLACE_PLAYLIST"; placeholderId: string; playlist: Playlist }
   | { type: "START_FETCH"; playlistId: string }
@@ -20,10 +21,12 @@ export type LibraryAction =
   | { type: "SET_SEARCH"; search: string }
 
 export const initialLibraryState: LibraryState = {
-  // Real playlists are loaded from the backend on mount (SET_PLAYLISTS).
+  // Real playlists are loaded from the backend after the UI binds (SET_PLAYLISTS).
   playlists: [],
   selectedPlaylistId: null,
   search: "",
+  // The sidebar shows a loading state until the first load resolves.
+  initialLoading: true,
 }
 
 function mapPlaylist(
@@ -48,7 +51,11 @@ export function libraryReducer(
           action.playlists.find((p) => p.id === state.selectedPlaylistId)?.id ??
           action.playlists[0]?.id ??
           null,
+        initialLoading: false,
       }
+
+    case "INITIAL_LOAD_FAILED":
+      return { ...state, initialLoading: false }
 
     case "ADD_PLAYLIST":
       return {

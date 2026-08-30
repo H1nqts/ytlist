@@ -75,18 +75,24 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: "SET_PLAYLISTS", playlists: rows.map(toUiPlaylist) })
   }, [])
 
-  // Load saved playlists from the backend once on mount.
+  // Load saved playlists from the backend once on mount, but only after the
+  // UI has bound/painted: the sidebar renders its loading state first, then
+  // `playlist_get_all` runs on the next frame.
   React.useEffect(() => {
     let cancelled = false
-    reloadPlaylists().catch((err) => {
-      if (cancelled) return
-      console.error("Failed to load playlists", err)
-      toast.error("Couldn't load your playlists", {
-        description: String(err),
+    const frame = requestAnimationFrame(() => {
+      reloadPlaylists().catch((err) => {
+        if (cancelled) return
+        console.error("Failed to load playlists", err)
+        dispatch({ type: "INITIAL_LOAD_FAILED" })
+        toast.error("Couldn't load your playlists", {
+          description: String(err),
+        })
       })
     })
     return () => {
       cancelled = true
+      cancelAnimationFrame(frame)
     }
   }, [reloadPlaylists])
 

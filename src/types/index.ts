@@ -54,4 +54,6 @@ export interface LibraryState {
   playlists: Playlist[]
   selectedPlaylistId: string | null
   search: string
+  /** True until the first `playlist_get_all` load resolves (or fails). */
+  initialLoading: boolean
 }
