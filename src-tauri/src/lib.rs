@@ -2,6 +2,7 @@ mod commands;
 mod db;
 mod playlist;
 mod state;
+mod video;
 
 use state::AppState;
 use std::sync::Mutex;

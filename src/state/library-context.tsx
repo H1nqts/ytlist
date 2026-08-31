@@ -7,16 +7,13 @@ import {
   libraryReducer,
 } from "@/state/library-reducer"
 import {
-  fetchErrorFor,
-  isLikelyInvalidUrl,
-  refetchTracks,
-} from "@/data/mock-helpers"
-import {
   playlistAdd,
   playlistDelete,
+  playlistFetchVideos,
   playlistGetAll,
   playlistRename,
   toUiPlaylist,
+  toUiTrack,
 } from "@/lib/api"
 
 interface LibraryContextValue {
@@ -26,25 +23,17 @@ interface LibraryContextValue {
   /** Tracks of the selected playlist, filtered by the search query. */
   visibleTracks: Track[]
   addPlaylist: (url: string) => void
-  fetchPlaylist: (playlistId: string) => void
-  refreshPlaylist: (playlistId: string) => void
-  deletePlaylist: (playlistId: string) => void
-  renamePlaylist: (playlistId: string, title: string) => void
-  selectPlaylist: (playlistId: string) => void
+  fetchPlaylist: (playlistId: number) => void
+  refreshPlaylist: (playlistId: number) => void
+  deletePlaylist: (playlistId: number) => void
+  renamePlaylist: (playlistId: number, title: string) => void
+  selectPlaylist: (playlistId: number) => void
   setSearch: (search: string) => void
-  getPlaylist: (playlistId: string) => Playlist | undefined
+  getPlaylist: (playlistId: number) => Playlist | undefined
   getTrack: (trackId: string) => Track | undefined
 }
 
 const LibraryContext = React.createContext<LibraryContextValue | null>(null)
-
-const FETCH_MIN_MS = 800
-const FETCH_VARIANCE_MS = 700
-
-function fetchDelay(): number {
-  // Deterministic-enough jitter without Math.random at module scope.
-  return FETCH_MIN_MS + Math.floor((Date.now() % FETCH_VARIANCE_MS))
-}
 
 function filterTracks(playlist: Playlist | null, search: string): Track[] {
   if (!playlist) return []
@@ -58,16 +47,10 @@ function filterTracks(playlist: Playlist | null, search: string): Track[] {
 
 export function LibraryProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = React.useReducer(libraryReducer, initialLibraryState)
-  // Track pending timers so unmounts don't fire stale dispatches.
-  const timers = React.useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
-
-  React.useEffect(() => {
-    const pending = timers.current
-    return () => {
-      pending.forEach(clearTimeout)
-      pending.clear()
-    }
-  }, [])
+  // Per-playlist request counter; only the newest response may dispatch.
+  const fetchSeq = React.useRef(new Map<number, number>())
+  // Ids for playlists that aren't persisted yet; real row ids are positive.
+  const nextTempId = React.useRef(-1)
 
   // Reload the full playlist set from the backend (source of truth).
   const reloadPlaylists = React.useCallback(async () => {
@@ -96,18 +79,10 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     }
   }, [reloadPlaylists])
 
-  const runDeferred = React.useCallback((fn: () => void) => {
-    const id = setTimeout(() => {
-      timers.current.delete(id)
-      fn()
-    }, fetchDelay())
-    timers.current.add(id)
-  }, [])
-
   const addPlaylist = React.useCallback((url: string) => {
     const createdAt = Date.now()
-    // Client-only id for the loading row; replaced by the real backend id on success.
-    const tempId = `tmp-${createdAt.toString(36)}`
+    // Replaced by the real backend id on success.
+    const tempId = nextTempId.current--
     const trimmed = url.trim()
 
     // Insert a loading placeholder immediately so the spinner shows.
@@ -117,6 +92,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       sourceUrl: trimmed,
       thumbnailUrl: "",
       tracks: [],
+      tracksLoaded: false,
       status: "loading",
       loadingKind: "fetch",
       lastSyncedAt: new Date(createdAt).toISOString(),
@@ -141,65 +117,77 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       })
   }, [])
 
-  const fetchPlaylist = React.useCallback(
-    (playlistId: string) => {
+  // `kind` only selects which loading text the UI shows.
+  const loadTracks = React.useCallback(
+    (playlistId: number, kind: "fetch" | "refresh") => {
       const playlist = state.playlists.find((p) => p.id === playlistId)
       if (!playlist) return
-      dispatch({ type: "START_FETCH", playlistId })
-      const at = Date.now()
-      const invalid = isLikelyInvalidUrl(playlist.sourceUrl)
-      runDeferred(() => {
-        if (invalid) {
+      if (!playlist.sourceUrl) return
+      // Not persisted yet, so the backend has nothing to fetch for it.
+      if (playlistId < 0) return
+
+      dispatch({
+        type: kind === "fetch" ? "START_FETCH" : "START_REFRESH",
+        playlistId,
+      })
+
+      const inFlight = (fetchSeq.current.get(playlistId) ?? 0) + 1
+      fetchSeq.current.set(playlistId, inFlight)
+
+      playlistFetchVideos(playlistId)
+        .then((videos) => {
+          if (fetchSeq.current.get(playlistId) !== inFlight) return
+          dispatch({
+            type: "FETCH_SUCCESS",
+            playlistId,
+            tracks: videos.map(toUiTrack),
+            syncedAt: new Date().toISOString(),
+          })
+        })
+        .catch((err) => {
+          if (fetchSeq.current.get(playlistId) !== inFlight) return
           dispatch({
             type: "FETCH_ERROR",
             playlistId,
-            message: fetchErrorFor(playlist.sourceUrl),
+            message: String(err),
           })
-          return
-        }
-        dispatch({
-          type: "FETCH_SUCCESS",
-          playlistId,
-          tracks: refetchTracks(playlistId, playlist.sourceUrl, at),
-          syncedAt: new Date(at).toISOString(),
         })
-      })
     },
-    [state.playlists, runDeferred]
+    [state.playlists]
+  )
+
+  const fetchPlaylist = React.useCallback(
+    (playlistId: number) => loadTracks(playlistId, "fetch"),
+    [loadTracks]
   )
 
   const refreshPlaylist = React.useCallback(
-    (playlistId: string) => {
-      const playlist = state.playlists.find((p) => p.id === playlistId)
-      if (!playlist) return
-      // "Refresh" reloads locally stored info — quick, never errors.
-      dispatch({ type: "START_REFRESH", playlistId })
-      const at = Date.now()
-      runDeferred(() => {
-        dispatch({
-          type: "FETCH_SUCCESS",
-          playlistId,
-          tracks: playlist.tracks,
-          syncedAt: new Date(at).toISOString(),
-        })
-      })
-    },
-    [state.playlists, runDeferred]
+    (playlistId: number) => loadTracks(playlistId, "refresh"),
+    [loadTracks]
   )
 
+  // Playlists come from the DB without videos, so fetch on first selection.
+  React.useEffect(() => {
+    const id = state.selectedPlaylistId
+    if (!id) return
+    const playlist = state.playlists.find((p) => p.id === id)
+    if (!playlist || playlist.tracksLoaded) return
+    if (playlist.status === "loading" || playlist.status === "error") return
+    loadTracks(id, "fetch")
+  }, [state.selectedPlaylistId, state.playlists, loadTracks])
+
   const deletePlaylist = React.useCallback(
-    (playlistId: string) => {
+    (playlistId: number) => {
       // Optimistically remove from the UI.
       dispatch({ type: "DELETE_PLAYLIST", playlistId })
 
-      // Mock/seed rows (string ids) live only in memory.
-      const numericId = Number(playlistId)
-      if (!Number.isInteger(numericId)) {
+      // Placeholder rows live only in memory.
+      if (playlistId < 0) {
         toast.success("Removed from library")
         return
       }
 
-      playlistDelete(numericId)
+      playlistDelete(playlistId)
         .then(() => {
           toast.success("Removed from library")
         })
@@ -212,21 +200,19 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     [reloadPlaylists]
   )
   const renamePlaylist = React.useCallback(
-    (playlistId: string, title: string) => {
+    (playlistId: number, title: string) => {
       // Optimistically update the UI, then persist via the backend command.
       const previous =
         state.playlists.find((p) => p.id === playlistId)?.title ?? title
       dispatch({ type: "RENAME_PLAYLIST", playlistId, title })
 
-      // Only call the backend for real (numeric-id) playlists; mock/seed rows
-      // use string ids and live purely in memory.
-      const numericId = Number(playlistId)
-      if (!Number.isInteger(numericId)) {
+      // Placeholder rows live only in memory.
+      if (playlistId < 0) {
         toast.success("Playlist renamed")
         return
       }
 
-      playlistRename(numericId, title)
+      playlistRename(playlistId, title)
         .then((row) => {
           // Reconcile with whatever the backend stored (it's the source of truth).
           if (row.name !== title) {
@@ -243,7 +229,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     [state.playlists]
   )
   const selectPlaylist = React.useCallback(
-    (playlistId: string) => dispatch({ type: "SELECT_PLAYLIST", playlistId }),
+    (playlistId: number) => dispatch({ type: "SELECT_PLAYLIST", playlistId }),
     []
   )
   const setSearch = React.useCallback(
@@ -262,7 +248,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
   )
 
   const getPlaylist = React.useCallback(
-    (playlistId: string) => state.playlists.find((p) => p.id === playlistId),
+    (playlistId: number) => state.playlists.find((p) => p.id === playlistId),
     [state.playlists]
   )
 

@@ -11,7 +11,7 @@ interface PlayerContextValue {
   state: PlayerState
   currentTrack: Track | null
   /** Start playing a track from within a playlist (builds the queue). */
-  playTrack: (trackId: string, playlistId: string) => void
+  playTrack: (trackId: string, playlistId: number) => void
   togglePlay: () => void
   next: () => void
   prev: () => void
@@ -81,7 +81,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   ])
 
   const playTrack = React.useCallback(
-    (trackId: string, playlistId: string) => {
+    (trackId: string, playlistId: number) => {
       const playlist = getPlaylist(playlistId)
       const track = playlist?.tracks.find((t) => t.id === trackId)
       if (!playlist || !track) return

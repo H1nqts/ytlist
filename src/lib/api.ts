@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core"
 
-import type { Playlist as UiPlaylist } from "@/types"
-import { mockTracksForPlaylist } from "@/data/mock-helpers"
+import type { Playlist as UiPlaylist, Track as UiTrack } from "@/types"
 
 export interface Playlist {
   id: number
@@ -12,6 +11,22 @@ export interface Playlist {
   views: number
   last_updated_at: string | null
   last_synced_at: string
+}
+
+export interface Channel {
+  id: string
+  name: string
+  icon: string
+}
+
+export interface Video {
+  id: string
+  title: string
+  thumbnail: string
+  channel: Channel
+  /** Millisecond */
+  duration: number
+  views: number
 }
 
 export function playlistAdd(url: string): Promise<Playlist> {
@@ -30,18 +45,32 @@ export function playlistGetAll(): Promise<Playlist[]> {
   return invoke<Playlist[]>("playlist_get_all")
 }
 
-export function toUiPlaylist(row: Playlist): UiPlaylist {
-  const id = String(row.id)
-  const createdAt = new Date(row.last_synced_at).getTime()
-  const safeCreatedAt = Number.isFinite(createdAt) ? createdAt : Date.now()
+export function playlistFetchVideos(id: number): Promise<Video[]> {
+  return invoke<Video[]>("playlist_fetch_videos", { id })
+}
 
+export function toUiTrack(video: Video): UiTrack {
   return {
-    id,
+    id: video.id,
+    title: video.title,
+    channel: video.channel.name,
+    channelAvatarUrl: video.channel.icon || undefined,
+    thumbnailUrl: video.thumbnail,
+    durationSec: Math.round(video.duration / 1000),
+    views: video.views,
+  }
+}
+
+export function toUiPlaylist(row: Playlist): UiPlaylist {
+  return {
+    id: row.id,
     title: row.name,
     sourceUrl: row.url,
     thumbnailUrl: row.thumbnail_url,
     status: "idle",
     lastSyncedAt: row.last_synced_at,
-    tracks: mockTracksForPlaylist(id, row.url, safeCreatedAt),
+    // Fetched separately via playlist_fetch_videos.
+    tracks: [],
+    tracksLoaded: false,
   }
 }

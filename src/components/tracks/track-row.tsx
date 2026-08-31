@@ -18,7 +18,7 @@ import { useSettings } from "@/hooks/use-settings"
 interface TrackRowProps {
   track: Track
   index: number
-  playlistId: string
+  playlistId: number
 }
 
 function initials(name: string): string {

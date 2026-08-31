@@ -49,6 +49,22 @@ export function TrackList({ playlist }: TrackListProps) {
     )
   }
 
+  if (!playlist.tracksLoaded) {
+    return (
+      <EmptyState
+        icon={DownloadCloudIcon}
+        title="No tracks loaded yet"
+        description="Fetch this playlist from its link to load its tracks."
+        action={
+          <Button variant="outline" onClick={() => fetchPlaylist(playlist.id)}>
+            <DownloadCloudIcon />
+            Fetch from link
+          </Button>
+        }
+      />
+    )
+  }
+
   if (playlist.tracks.length === 0) {
     return (
       <EmptyState

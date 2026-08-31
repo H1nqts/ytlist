@@ -21,7 +21,8 @@ pub struct Playlist {
 
 pub async fn fetch(list_id: &str) -> Result<Playlist> {
     let opts = PlaylistSearchOptions {
-        fetch_all: true,
+        limit: 0,
+        fetch_all: false,
         ..Default::default()
     };
     let mut playlist = search::Playlist::get(list_id, Some(&opts)).await?;
@@ -41,6 +42,10 @@ pub async fn fetch(list_id: &str) -> Result<Playlist> {
         last_updated_at: playlist.last_update,
         last_synced_at: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
     })
+}
+
+pub fn get_by_id(conn: &Connection, id: i64) -> Result<Playlist> {
+    repo::get_by_id(conn, id)
 }
 
 pub fn save(conn: &Connection, playlist: &Playlist) -> Result<Playlist> {

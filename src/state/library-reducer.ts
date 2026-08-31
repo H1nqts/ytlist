@@ -4,20 +4,20 @@ export type LibraryAction =
   | { type: "SET_PLAYLISTS"; playlists: Playlist[] }
   | { type: "INITIAL_LOAD_FAILED" }
   | { type: "ADD_PLAYLIST"; playlist: Playlist }
-  | { type: "REPLACE_PLAYLIST"; placeholderId: string; playlist: Playlist }
-  | { type: "START_FETCH"; playlistId: string }
-  | { type: "START_REFRESH"; playlistId: string }
+  | { type: "REPLACE_PLAYLIST"; placeholderId: number; playlist: Playlist }
+  | { type: "START_FETCH"; playlistId: number }
+  | { type: "START_REFRESH"; playlistId: number }
   | {
       type: "FETCH_SUCCESS"
-      playlistId: string
+      playlistId: number
       tracks: Track[]
       syncedAt: string
       title?: string
     }
-  | { type: "FETCH_ERROR"; playlistId: string; message: string }
-  | { type: "DELETE_PLAYLIST"; playlistId: string }
-  | { type: "RENAME_PLAYLIST"; playlistId: string; title: string }
-  | { type: "SELECT_PLAYLIST"; playlistId: string }
+  | { type: "FETCH_ERROR"; playlistId: number; message: string }
+  | { type: "DELETE_PLAYLIST"; playlistId: number }
+  | { type: "RENAME_PLAYLIST"; playlistId: number; title: string }
+  | { type: "SELECT_PLAYLIST"; playlistId: number }
   | { type: "SET_SEARCH"; search: string }
 
 export const initialLibraryState: LibraryState = {
@@ -31,7 +31,7 @@ export const initialLibraryState: LibraryState = {
 
 function mapPlaylist(
   state: LibraryState,
-  id: string,
+  id: number,
   fn: (p: Playlist) => Playlist
 ): Playlist[] {
   return state.playlists.map((p) => (p.id === id ? fn(p) : p))
@@ -109,6 +109,7 @@ export function libraryReducer(
           loadingKind: undefined,
           errorMessage: undefined,
           tracks: action.tracks,
+          tracksLoaded: true,
           title: action.title ?? p.title,
           lastSyncedAt: action.syncedAt,
         })),

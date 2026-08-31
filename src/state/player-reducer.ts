@@ -4,7 +4,7 @@ export type PlayerAction =
   | {
       type: "PLAY_TRACK"
       trackId: string
-      playlistId: string
+      playlistId: number
       durationSec: number
       /** Ordered ids of the playlist this track belongs to. */
       playlistTrackIds: string[]
