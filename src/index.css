@@ -46,6 +46,22 @@
     --radius-2xl: calc(var(--radius) * 1.8);
     --radius-3xl: calc(var(--radius) * 2.2);
     --radius-4xl: calc(var(--radius) * 2.6);
+    --animate-marquee-text: marquee-text linear infinite alternate;
+}
+
+@keyframes marquee-text {
+    from {
+        transform: translateX(0);
+    }
+    to {
+        transform: translateX(var(--marquee-distance, 0));
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .animate-marquee-text {
+        animation: none;
+    }
 }
 
 :root {

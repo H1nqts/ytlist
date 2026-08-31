@@ -2,6 +2,7 @@ import { ClockIcon } from "lucide-react"
 
 import { formatRelative, formatTotalDuration } from "@/lib/format"
 import { Thumbnail } from "@/components/ui/thumbnail"
+import { MarqueeText } from "@/components/ui/marquee-text"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { useLibrary } from "@/hooks/use-library"
@@ -34,9 +35,9 @@ export function TrackView() {
           <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
             Playlist
           </p>
-          <h1 className="truncate font-heading text-2xl font-semibold">
+          <MarqueeText as="h1" className="font-heading text-2xl font-semibold">
             {selectedPlaylist.title}
-          </h1>
+          </MarqueeText>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {isReady ? (
               <>

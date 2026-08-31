@@ -7,6 +7,7 @@ import { formatDuration, formatViews } from "@/lib/format"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Thumbnail } from "@/components/ui/thumbnail"
+import { MarqueeText } from "@/components/ui/marquee-text"
 import {
   Tooltip,
   TooltipContent,
@@ -55,6 +56,7 @@ export function TrackRow({ track, index, playlistId }: TrackRowProps) {
         isCurrent && "bg-accent"
       )}
       data-current={isCurrent}
+      data-marquee-group
     >
       {/* Index / play indicator */}
       <div className="flex w-6 shrink-0 items-center justify-center text-xs text-muted-foreground">
@@ -83,18 +85,20 @@ export function TrackRow({ track, index, playlistId }: TrackRowProps) {
       <Thumbnail
         src={track.thumbnailUrl}
         alt={track.title}
-        className="aspect-video h-10 w-auto"
+        className="hidden aspect-video h-10 w-auto @xs:block"
       />
 
-      <div className="min-w-0 flex-1">
-        <p
+      <div className="min-w-0 flex-1 @2xl:max-w-[46ch] @5xl:max-w-[64ch]">
+        <MarqueeText
+          as="p"
+          group
           className={cn(
-            "truncate text-sm font-medium",
+            "text-sm font-medium",
             isCurrent ? "text-primary" : "text-foreground"
           )}
         >
           {track.title}
-        </p>
+        </MarqueeText>
         <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
           <Avatar className="size-4">
             <AvatarImage src={track.channelAvatarUrl} alt={track.channel} />
@@ -106,12 +110,14 @@ export function TrackRow({ track, index, playlistId }: TrackRowProps) {
         </div>
       </div>
 
-      <div className="hidden w-28 items-center gap-1 text-xs text-muted-foreground sm:flex">
-        <EyeIcon className="size-3.5" />
+      <div className="flex-1" aria-hidden />
+
+      <div className="hidden w-24 shrink-0 items-center gap-1 text-xs text-muted-foreground @lg:flex">
+        <EyeIcon className="size-3.5 shrink-0" />
         <span className="truncate">{formatViews(track.views)}</span>
       </div>
 
-      <div className="w-12 text-right text-xs tabular-nums text-muted-foreground">
+      <div className="w-12 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
         {formatDuration(track.durationSec)}
       </div>
 

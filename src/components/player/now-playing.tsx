@@ -1,4 +1,5 @@
 import { Thumbnail } from "@/components/ui/thumbnail"
+import { MarqueeText } from "@/components/ui/marquee-text"
 import { usePlayer } from "@/hooks/use-player"
 
 export function NowPlaying() {
@@ -21,16 +22,16 @@ export function NowPlaying() {
   }
 
   return (
-    <div className="flex min-w-0 items-center gap-3">
+    <div className="flex min-w-0 items-center gap-3" data-marquee-group>
       <Thumbnail
         src={currentTrack.thumbnailUrl}
         alt={currentTrack.title}
         className="aspect-square size-14"
       />
-      <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-foreground">
+      <div className="min-w-0 flex-1">
+        <MarqueeText as="p" group className="text-sm font-medium text-foreground">
           {currentTrack.title}
-        </p>
+        </MarqueeText>
         <p className="truncate text-xs text-muted-foreground">
           {currentTrack.channel}
         </p>

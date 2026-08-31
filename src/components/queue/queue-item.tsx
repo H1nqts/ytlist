@@ -5,6 +5,7 @@ import type { Track } from "@/types"
 import { formatDuration } from "@/lib/format"
 import { Button } from "@/components/ui/button"
 import { Thumbnail } from "@/components/ui/thumbnail"
+import { MarqueeText } from "@/components/ui/marquee-text"
 import { usePlayer } from "@/hooks/use-player"
 
 interface QueueItemProps {
@@ -22,6 +23,7 @@ export function QueueItem({ track, current = false }: QueueItemProps) {
         "group/qitem flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors",
         current ? "bg-accent" : "hover:bg-accent"
       )}
+      data-marquee-group
     >
       <Thumbnail
         src={track.thumbnailUrl}
@@ -29,14 +31,16 @@ export function QueueItem({ track, current = false }: QueueItemProps) {
         className="aspect-video h-9 w-auto"
       />
       <div className="min-w-0 flex-1">
-        <p
+        <MarqueeText
+          as="p"
+          group
           className={cn(
-            "truncate text-sm font-medium",
+            "text-sm font-medium",
             current ? "text-primary" : "text-foreground"
           )}
         >
           {track.title}
-        </p>
+        </MarqueeText>
         <p className="truncate text-xs text-muted-foreground">{track.channel}</p>
       </div>
 

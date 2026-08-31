@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { Thumbnail } from "@/components/ui/thumbnail"
+import { MarqueeText } from "@/components/ui/marquee-text"
 import {
   ContextMenu,
   ContextMenuContent,
@@ -113,6 +114,7 @@ export function PlaylistListItem({ playlist, active }: PlaylistListItemProps) {
               active && "bg-sidebar-accent"
             )}
             data-active={active}
+            data-marquee-group
           >
             <Thumbnail
               src={playlist.thumbnailUrl}
@@ -121,9 +123,13 @@ export function PlaylistListItem({ playlist, active }: PlaylistListItemProps) {
             />
 
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-sidebar-foreground">
+              <MarqueeText
+                as="p"
+                group
+                className="text-sm font-medium text-sidebar-foreground"
+              >
                 {playlist.title}
-              </p>
+              </MarqueeText>
               <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
                 {isLoading ? (
                   <>

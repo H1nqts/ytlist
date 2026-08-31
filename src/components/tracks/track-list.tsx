@@ -87,7 +87,7 @@ export function TrackList({ playlist }: TrackListProps) {
 
   return (
     <ScrollArea className="h-full">
-      <div className="flex flex-col gap-0.5 px-3 pb-4">
+      <div className="@container flex flex-col gap-0.5 px-3 pb-4">
         {visibleTracks.map((track, i) => (
           <TrackRow
             key={track.id}
