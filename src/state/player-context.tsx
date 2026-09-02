@@ -33,7 +33,7 @@ interface PlayerContextValue {
   ytdlp: YtdlpStatus
   retryYtdlp: () => void
   /** Start playing a track from within a playlist (builds the queue). */
-  playTrack: (trackId: string, playlistId: number) => void
+  playTrack: (trackId: string, playlistId: number, shuffle?: boolean) => void
   togglePlay: () => void
   next: () => void
   prev: () => void
@@ -96,7 +96,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const playTrack = React.useCallback(
-    (trackId: string, playlistId: number) => {
+    (trackId: string, playlistId: number, shuffle?: boolean) => {
       const playlist = getPlaylist(playlistId)
       const track = playlist?.tracks.find((t) => t.id === trackId)
       if (!playlist || !track) return
@@ -106,6 +106,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         playlistId,
         durationSec: track.durationSec,
         playlistTrackIds: playlist.tracks.map((t) => t.id),
+        shuffle,
       })
     },
     [getPlaylist]

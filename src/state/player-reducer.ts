@@ -11,6 +11,7 @@ export type PlayerAction =
       durationSec: number
       /** Ordered ids of the playlist this track belongs to. */
       playlistTrackIds: string[]
+      shuffle?: boolean
     }
   | { type: "TOGGLE_PLAY" }
   | { type: "SET_DURATION"; durationSec: number }
@@ -80,14 +81,16 @@ export function playerReducer(
 ): PlayerState {
   switch (action.type) {
     case "PLAY_TRACK": {
+      const shuffle = action.shuffle ?? state.shuffle
       return {
         ...state,
         isPlaying: true,
+        shuffle,
         currentTrackId: action.trackId,
         currentPlaylistId: action.playlistId,
         durationSec: action.durationSec,
         progressSec: 0,
-        queue: buildQueue(action.playlistTrackIds, action.trackId, state.shuffle),
+        queue: buildQueue(action.playlistTrackIds, action.trackId, shuffle),
         history: state.currentTrackId
           ? [...state.history, state.currentTrackId]
           : state.history,

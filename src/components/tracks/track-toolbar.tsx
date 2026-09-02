@@ -14,7 +14,7 @@ interface TrackToolbarProps {
 
 export function TrackToolbar({ playlist }: TrackToolbarProps) {
   const { state, setSearch, visibleTracks } = useLibrary()
-  const { state: playerState, playTrack, toggleShuffle } = usePlayer()
+  const { playTrack } = usePlayer()
 
   const [localSearch, setLocalSearch] = React.useState(state.search)
   const debounced = useDebouncedValue(localSearch, 250)
@@ -37,10 +37,9 @@ export function TrackToolbar({ playlist }: TrackToolbarProps) {
 
   function handleShuffleAll() {
     if (!playable) return
-    // Enable shuffle then start from a track — queue is shuffled on PLAY_TRACK.
-    if (!playerState.shuffle) toggleShuffle()
-    const first = playlist.tracks[0]
-    playTrack(first.id, playlist.id)
+    const start =
+      playlist.tracks[Math.floor(Math.random() * playlist.tracks.length)]
+    playTrack(start.id, playlist.id, true)
   }
 
   return (
