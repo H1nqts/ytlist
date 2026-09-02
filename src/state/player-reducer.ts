@@ -1,5 +1,8 @@
 import type { PlayerState, RepeatMode } from "@/types"
 
+/** Past this point, "previous" restarts the current track instead of going back. */
+export const RESTART_THRESHOLD_SEC = 3
+
 export type PlayerAction =
   | {
       type: "PLAY_TRACK"
@@ -18,7 +21,8 @@ export type PlayerAction =
   | { type: "TOGGLE_MUTE" }
   | { type: "TOGGLE_SHUFFLE" }
   | { type: "CYCLE_REPEAT" }
-  | { type: "TICK" }
+  | { type: "PROGRESS"; progressSec: number }
+  | { type: "PAUSE" }
   | { type: "SET_QUEUE"; queue: string[] }
   | { type: "ENQUEUE"; trackId: string }
   | { type: "REMOVE_FROM_QUEUE"; trackId: string }
@@ -100,7 +104,7 @@ export function playerReducer(
     case "NEXT": {
       const [head, ...rest] = state.queue
       if (!head) {
-        // Nothing queued — stop at end (repeat handling lives in TICK/effects).
+        // Nothing queued — stop at end ("repeat all" re-seeding lives in the provider).
         return { ...state, isPlaying: false }
       }
       return {
@@ -116,8 +120,7 @@ export function playerReducer(
     }
 
     case "PREV": {
-      // Restart the current track if we're more than 3s in.
-      if (state.progressSec > 3) {
+      if (state.progressSec > RESTART_THRESHOLD_SEC) {
         return { ...state, progressSec: 0 }
       }
       const prev = state.history[state.history.length - 1]
@@ -156,30 +159,12 @@ export function playerReducer(
     case "CYCLE_REPEAT":
       return { ...state, repeat: nextRepeat[state.repeat] }
 
-    case "TICK": {
-      if (!state.isPlaying || !state.currentTrackId) return state
-      const next = state.progressSec + 1
-      if (next < state.durationSec) {
-        return { ...state, progressSec: next }
-      }
-      // Reached the end of the track — apply repeat behavior.
-      if (state.repeat === "one") {
-        return { ...state, progressSec: 0 }
-      }
-      const [head, ...rest] = state.queue
-      if (head) {
-        return {
-          ...state,
-          currentTrackId: head,
-          queue: rest,
-          progressSec: 0,
-          history: [...state.history, state.currentTrackId],
-        }
-      }
-      // Queue empty. Note: "repeat all" re-seeding is handled in the provider
-      // (it needs the playlist's track ids); here we just pause at the end.
-      return { ...state, isPlaying: false, progressSec: state.durationSec }
-    }
+    case "PROGRESS":
+      if (!state.currentTrackId) return state
+      return { ...state, progressSec: action.progressSec }
+
+    case "PAUSE":
+      return { ...state, isPlaying: false }
 
     case "SET_QUEUE":
       return { ...state, queue: action.queue }

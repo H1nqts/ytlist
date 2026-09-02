@@ -1,15 +1,37 @@
 import * as React from "react"
+import { listen } from "@tauri-apps/api/event"
+import { toast } from "sonner"
 
 import type { PlayerState, Track } from "@/types"
 import {
   initialPlayerState,
   playerReducer,
+  RESTART_THRESHOLD_SEC,
 } from "@/state/player-reducer"
 import { LibraryContext } from "@/state/library-context"
+import {
+  streamResolve,
+  ytdlpRetry,
+  ytdlpStatus as fetchYtdlpStatus,
+  type YtdlpStatus,
+} from "@/lib/api"
+
+const YTDLP_STATUS_EVENT = "ytdlp://status"
+
+/** Re-resolve a stream this long before its URL expires. */
+const EXPIRY_MARGIN_SEC = 60
+
+/** Assumed lifetime when the stream URL carries no `expire` parameter. */
+const FALLBACK_TTL_SEC = 3600
 
 interface PlayerContextValue {
   state: PlayerState
   currentTrack: Track | null
+  /** True while the current track's stream URL is being resolved. */
+  streamLoading: boolean
+  streamError: string | null
+  ytdlp: YtdlpStatus
+  retryYtdlp: () => void
   /** Start playing a track from within a playlist (builds the queue). */
   playTrack: (trackId: string, playlistId: number) => void
   togglePlay: () => void
@@ -35,50 +57,43 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const { getTrack, getPlaylist } = library
 
   const [state, dispatch] = React.useReducer(playerReducer, initialPlayerState)
+  const [streamLoading, setStreamLoading] = React.useState(false)
+  const [streamError, setStreamError] = React.useState<string | null>(null)
+  const [ytdlp, setYtdlp] = React.useState<YtdlpStatus>({
+    state: "checking",
+    message: null,
+  })
 
-  // Mock playback: advance progress one second at a time while playing.
+  const audioRef = React.useRef<HTMLAudioElement | null>(null)
+  if (audioRef.current === null && typeof Audio !== "undefined") {
+    // No crossOrigin: googlevideo sends no CORS headers, so a CORS load fails.
+    audioRef.current = new Audio()
+    audioRef.current.preload = "auto"
+  }
+
+  const streamCache = React.useRef(
+    new Map<string, { url: string; expiresAt: number }>()
+  )
+  const loadSeq = React.useRef(0)
+  const retriedTracks = React.useRef(new Set<string>())
+
   React.useEffect(() => {
-    if (!state.isPlaying) return
-    const id = setInterval(() => dispatch({ type: "TICK" }), 1000)
-    return () => clearInterval(id)
-  }, [state.isPlaying])
-
-  // "Repeat all" re-seed: when the queue empties at the end of a playlist,
-  // rebuild it from the current playlist's track order.
-  React.useEffect(() => {
-    if (
-      state.repeat !== "all" ||
-      state.isPlaying ||
-      state.queue.length > 0 ||
-      !state.currentPlaylistId ||
-      !state.currentTrackId
-    ) {
-      return
-    }
-    // Only re-seed if we actually reached the end (progress at duration).
-    if (state.durationSec === 0 || state.progressSec < state.durationSec) return
-
-    const playlist = getPlaylist(state.currentPlaylistId)
-    if (!playlist || playlist.tracks.length === 0) return
-
-    const first = playlist.tracks[0]
-    dispatch({
-      type: "PLAY_TRACK",
-      trackId: first.id,
-      playlistId: playlist.id,
-      durationSec: first.durationSec,
-      playlistTrackIds: playlist.tracks.map((t) => t.id),
+    let active = true
+    const unlisten = listen<YtdlpStatus>(YTDLP_STATUS_EVENT, (event) => {
+      if (active) setYtdlp(event.payload)
     })
-  }, [
-    state.repeat,
-    state.isPlaying,
-    state.queue.length,
-    state.currentPlaylistId,
-    state.currentTrackId,
-    state.durationSec,
-    state.progressSec,
-    getPlaylist,
-  ])
+    // Pull once after subscribing, so a status settled before mount is not missed.
+    fetchYtdlpStatus()
+      .then((status) => {
+        if (active) setYtdlp(status)
+      })
+      .catch(() => {})
+
+    return () => {
+      active = false
+      unlisten.then((off) => off()).catch(() => {})
+    }
+  }, [])
 
   const playTrack = React.useCallback(
     (trackId: string, playlistId: number) => {
@@ -120,12 +135,23 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: "NEXT" })
   }, [state.queue.length, state.repeat, state.currentPlaylistId, getPlaylist])
 
-  const prev = React.useCallback(() => dispatch({ type: "PREV" }), [])
+  const prev = React.useCallback(() => {
+    // PREV restarts the current track past RESTART_THRESHOLD_SEC; rewind the
+    // element too, or the next timeupdate reports the old position back.
+    const audio = audioRef.current
+    if (audio && audio.currentTime > RESTART_THRESHOLD_SEC) {
+      audio.currentTime = 0
+    }
+    dispatch({ type: "PREV" })
+  }, [])
   const togglePlay = React.useCallback(() => dispatch({ type: "TOGGLE_PLAY" }), [])
-  const seek = React.useCallback(
-    (progressSec: number) => dispatch({ type: "SEEK", progressSec }),
-    []
-  )
+  const seek = React.useCallback((progressSec: number) => {
+    const audio = audioRef.current
+    if (audio && Number.isFinite(audio.duration)) {
+      audio.currentTime = Math.min(progressSec, audio.duration)
+    }
+    dispatch({ type: "SEEK", progressSec })
+  }, [])
   const setVolume = React.useCallback(
     (volume: number) => dispatch({ type: "SET_VOLUME", volume }),
     []
@@ -153,6 +179,173 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     [getTrack]
   )
 
+  const retryYtdlp = React.useCallback(() => {
+    setYtdlp({ state: "checking", message: null })
+    ytdlpRetry()
+      .then(setYtdlp)
+      .catch((err) => setYtdlp({ state: "error", message: String(err) }))
+  }, [])
+
+  const resolveStream = React.useCallback(
+    async (trackId: string, force: boolean) => {
+      const cached = streamCache.current.get(trackId)
+      const now = Date.now() / 1000
+      if (!force && cached && cached.expiresAt - now > EXPIRY_MARGIN_SEC) {
+        return cached.url
+      }
+
+      const info = await streamResolve(trackId)
+      streamCache.current.set(trackId, {
+        url: info.url,
+        expiresAt: info.expires_at ?? now + FALLBACK_TTL_SEC,
+      })
+      return info.url
+    },
+    []
+  )
+
+  // Latest values for the audio listeners, which are bound once.
+  const handlers = React.useRef({ next, repeat: state.repeat })
+  handlers.current = { next, repeat: state.repeat }
+
+  React.useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    const onTimeUpdate = () =>
+      dispatch({ type: "PROGRESS", progressSec: audio.currentTime })
+
+    const onLoadedMetadata = () => {
+      if (Number.isFinite(audio.duration)) {
+        dispatch({ type: "SET_DURATION", durationSec: audio.duration })
+      }
+    }
+
+    const onEnded = () => {
+      if (handlers.current.repeat === "one") {
+        audio.currentTime = 0
+        void audio.play().catch(() => {})
+        return
+      }
+      handlers.current.next()
+    }
+
+    audio.addEventListener("timeupdate", onTimeUpdate)
+    audio.addEventListener("loadedmetadata", onLoadedMetadata)
+    audio.addEventListener("ended", onEnded)
+
+    return () => {
+      audio.removeEventListener("timeupdate", onTimeUpdate)
+      audio.removeEventListener("loadedmetadata", onLoadedMetadata)
+      audio.removeEventListener("ended", onEnded)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    audio.volume = state.volume
+    audio.muted = state.muted
+  }, [state.volume, state.muted])
+
+  const trackId = state.currentTrackId
+
+  React.useEffect(() => {
+    const audio = audioRef.current
+    if (!audio || !trackId) return
+
+    const seq = ++loadSeq.current
+    retriedTracks.current.delete(trackId)
+    setStreamError(null)
+
+    // Stop the outgoing track now; resolving the next stream can take seconds.
+    audio.pause()
+    audio.removeAttribute("src")
+    audio.load()
+
+    const cached = streamCache.current.get(trackId)
+    const now = Date.now() / 1000
+    if (cached && cached.expiresAt - now > EXPIRY_MARGIN_SEC) {
+      audio.src = cached.url
+      audio.load()
+      return
+    }
+
+    setStreamLoading(true)
+    resolveStream(trackId, false)
+      .then((url) => {
+        if (loadSeq.current !== seq) return
+        setStreamLoading(false)
+        audio.src = url
+        audio.load()
+      })
+      .catch((err) => {
+        if (loadSeq.current !== seq) return
+        setStreamLoading(false)
+        setStreamError(String(err))
+        dispatch({ type: "PAUSE" })
+        toast.error("Couldn't play this track", { description: String(err) })
+      })
+  }, [trackId, resolveStream])
+
+  React.useEffect(() => {
+    const audio = audioRef.current
+    if (!audio || !state.currentTrackId) return
+
+    if (!state.isPlaying) {
+      audio.pause()
+      return
+    }
+    if (!audio.src || streamLoading) return
+
+    audio.play().catch((err: DOMException) => {
+      // A src swap aborts the pending play(); that is not a failure.
+      if (err.name === "AbortError") return
+      dispatch({ type: "PAUSE" })
+      toast.error("Playback failed", { description: err.message })
+    })
+  }, [state.isPlaying, state.currentTrackId, streamLoading])
+
+  // A stream URL can die mid-playback; re-resolve once before giving up.
+  React.useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    const onError = () => {
+      const id = state.currentTrackId
+      if (!audio.src || !id) return
+      if (retriedTracks.current.has(id)) {
+        setStreamError("Stream unavailable")
+        dispatch({ type: "PAUSE" })
+        toast.error("Couldn't play this track")
+        return
+      }
+
+      retriedTracks.current.add(id)
+      const resumeAt = audio.currentTime
+      const seq = ++loadSeq.current
+      setStreamLoading(true)
+      resolveStream(id, true)
+        .then((url) => {
+          if (loadSeq.current !== seq) return
+          setStreamLoading(false)
+          audio.src = url
+          audio.load()
+          audio.currentTime = resumeAt
+        })
+        .catch((err) => {
+          if (loadSeq.current !== seq) return
+          setStreamLoading(false)
+          setStreamError(String(err))
+          dispatch({ type: "PAUSE" })
+          toast.error("Couldn't play this track", { description: String(err) })
+        })
+    }
+
+    audio.addEventListener("error", onError)
+    return () => audio.removeEventListener("error", onError)
+  }, [state.currentTrackId, resolveStream])
+
   const currentTrack = React.useMemo(
     () => (state.currentTrackId ? getTrack(state.currentTrackId) ?? null : null),
     [state.currentTrackId, getTrack]
@@ -162,6 +355,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     () => ({
       state,
       currentTrack,
+      streamLoading,
+      streamError,
+      ytdlp,
+      retryYtdlp,
       playTrack,
       togglePlay,
       next,
@@ -178,6 +375,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     [
       state,
       currentTrack,
+      streamLoading,
+      streamError,
+      ytdlp,
+      retryYtdlp,
       playTrack,
       togglePlay,
       next,

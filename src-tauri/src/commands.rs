@@ -8,4 +8,5 @@ pub const COMMAND_HANDLERS: fn(tauri::ipc::Invoke) -> bool = tauri::generate_han
     playlist::commands::playlist_fetch_videos,
     ytdlp::commands::ytdlp_status,
     ytdlp::commands::ytdlp_retry,
+    ytdlp::commands::stream_resolve,
 ];

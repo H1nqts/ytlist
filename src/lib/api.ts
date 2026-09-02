@@ -29,6 +29,27 @@ export interface Video {
   views: number
 }
 
+export type YtdlpState =
+  | "checking"
+  | "downloading"
+  | "updating"
+  | "ready"
+  | "error"
+
+export interface YtdlpStatus {
+  state: YtdlpState
+  message: string | null
+}
+
+export interface StreamInfo {
+  url: string
+  ext: string | null
+  abr: number | null
+  acodec: string | null
+  /** Unix seconds */
+  expires_at: number | null
+}
+
 export function playlistAdd(url: string): Promise<Playlist> {
   return invoke<Playlist>("playlist_add", { url })
 }
@@ -47,6 +68,18 @@ export function playlistGetAll(): Promise<Playlist[]> {
 
 export function playlistFetchVideos(id: number): Promise<Video[]> {
   return invoke<Video[]>("playlist_fetch_videos", { id })
+}
+
+export function ytdlpStatus(): Promise<YtdlpStatus> {
+  return invoke<YtdlpStatus>("ytdlp_status")
+}
+
+export function ytdlpRetry(): Promise<YtdlpStatus> {
+  return invoke<YtdlpStatus>("ytdlp_retry")
+}
+
+export function streamResolve(videoId: string): Promise<StreamInfo> {
+  return invoke<StreamInfo>("stream_resolve", { videoId })
 }
 
 export function toUiTrack(video: Video): UiTrack {

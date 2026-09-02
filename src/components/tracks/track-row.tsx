@@ -31,13 +31,22 @@ function initials(name: string): string {
 }
 
 export function TrackRow({ track, index, playlistId }: TrackRowProps) {
-  const { state, currentTrack, playTrack, enqueue } = usePlayer()
+  const { state, currentTrack, ytdlp, playTrack, enqueue } = usePlayer()
   const { playActivation } = useSettings()
 
   const isCurrent = currentTrack?.id === track.id
   const isPlayingThis = isCurrent && state.isPlaying
+  const canPlay = ytdlp.state === "ready"
 
   function play() {
+    if (!canPlay) {
+      toast.error(
+        ytdlp.state === "error"
+          ? "Playback is unavailable"
+          : "Playback is still starting up"
+      )
+      return
+    }
     playTrack(track.id, playlistId)
   }
 

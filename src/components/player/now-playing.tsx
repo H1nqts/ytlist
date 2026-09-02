@@ -1,9 +1,35 @@
+import { Button } from "@/components/ui/button"
 import { Thumbnail } from "@/components/ui/thumbnail"
 import { MarqueeText } from "@/components/ui/marquee-text"
 import { usePlayer } from "@/hooks/use-player"
 
+const SETUP_MESSAGE: Record<string, string> = {
+  checking: "Preparing playback…",
+  downloading: "Downloading yt-dlp…",
+  updating: "Updating yt-dlp…",
+}
+
 export function NowPlaying() {
-  const { currentTrack } = usePlayer()
+  const { currentTrack, streamLoading, streamError, ytdlp, retryYtdlp } = usePlayer()
+
+  if (ytdlp.state === "error") {
+    return (
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="aspect-square size-14 shrink-0 rounded-md bg-muted" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-destructive">
+            Playback unavailable
+          </p>
+          <p className="truncate text-xs text-muted-foreground">
+            {ytdlp.message ?? "Could not set up yt-dlp"}
+          </p>
+        </div>
+        <Button size="sm" variant="outline" onClick={retryYtdlp}>
+          Retry
+        </Button>
+      </div>
+    )
+  }
 
   if (!currentTrack) {
     return (
@@ -14,7 +40,7 @@ export function NowPlaying() {
             Nothing playing
           </p>
           <p className="truncate text-xs text-muted-foreground">
-            Pick a track to start
+            {SETUP_MESSAGE[ytdlp.state] ?? "Pick a track to start"}
           </p>
         </div>
       </div>
@@ -33,7 +59,11 @@ export function NowPlaying() {
           {currentTrack.title}
         </MarqueeText>
         <p className="truncate text-xs text-muted-foreground">
-          {currentTrack.channel}
+          {streamLoading
+            ? "Loading stream…"
+            : streamError
+              ? streamError
+              : currentTrack.channel}
         </p>
       </div>
     </div>

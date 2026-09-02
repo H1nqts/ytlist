@@ -1,13 +1,21 @@
 pub mod commands;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 use tauri::async_runtime::Mutex;
 use tauri::{AppHandle, Emitter, Manager as _};
-use youtube_dl::download_yt_dlp;
+use url::Url;
+use youtube_dl::{download_yt_dlp, Format, Protocol, SingleVideo, YoutubeDl};
 
 pub const STATUS_EVENT: &str = "ytdlp://status";
+
+const AUDIO_FORMAT: &str = "bestaudio";
+const SOCKET_TIMEOUT: &str = "15";
+const PROCESS_TIMEOUT: Duration = Duration::from_secs(60);
+const VIDEO_ID_LEN: usize = 11;
 
 const BIN_NAME: &str = if cfg!(windows) {
     "yt-dlp.exe"
@@ -45,6 +53,16 @@ impl Status {
             message: Some(message),
         }
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct StreamInfo {
+    pub url: String,
+    pub ext: Option<String>,
+    pub abr: Option<f64>,
+    pub acodec: Option<String>,
+    /// unix seconds
+    pub expires_at: Option<i64>,
 }
 
 pub struct Manager {
@@ -119,6 +137,27 @@ impl Manager {
         self.status()
     }
 
+    pub async fn resolve_stream(&self, video_id: &str) -> Result<StreamInfo> {
+        validate_video_id(video_id)?;
+        let bin = self.ensure().await?;
+
+        let output = YoutubeDl::new(format!("https://www.youtube.com/watch?v={video_id}"))
+            .youtube_dl_path(bin)
+            .format(AUDIO_FORMAT)
+            .extra_arg("--no-playlist")
+            .socket_timeout(SOCKET_TIMEOUT)
+            .process_timeout(PROCESS_TIMEOUT)
+            .run_async()
+            .await
+            .context("failed to run yt-dlp")?;
+
+        let video = output
+            .into_single_video()
+            .context("yt-dlp returned a playlist, expected a single video")?;
+
+        stream_info(video)
+    }
+
     async fn download(&self) -> Result<PathBuf> {
         self.set_status(Status::new(State::Downloading));
         std::fs::create_dir_all(&self.dir)
@@ -145,6 +184,72 @@ impl Manager {
             Err(e) => Err(e),
         }
     }
+}
+
+fn validate_video_id(id: &str) -> Result<()> {
+    let valid = id.len() == VIDEO_ID_LEN
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_');
+
+    if valid {
+        Ok(())
+    } else {
+        bail!("invalid video id")
+    }
+}
+
+fn stream_info(video: SingleVideo) -> Result<StreamInfo> {
+    if let Some(url) = video.url.filter(|url| !url.is_empty()) {
+        return Ok(StreamInfo {
+            expires_at: expires_at(&url),
+            url,
+            ext: video.ext,
+            abr: video.abr,
+            acodec: video.acodec,
+        });
+    }
+
+    let format = video
+        .formats
+        .unwrap_or_default()
+        .into_iter()
+        .filter(is_playable_audio)
+        .max_by(|a, b| {
+            a.abr
+                .unwrap_or_default()
+                .partial_cmp(&b.abr.unwrap_or_default())
+                .unwrap_or(Ordering::Equal)
+        })
+        .context("no playable audio-only format found")?;
+
+    let url = format.url.context("selected format has no url")?;
+
+    Ok(StreamInfo {
+        expires_at: expires_at(&url),
+        url,
+        ext: format.ext,
+        abr: format.abr,
+        acodec: format.acodec,
+    })
+}
+
+fn is_playable_audio(format: &Format) -> bool {
+    let audio_only = format.acodec.is_some() && format.vcodec.is_none();
+    let progressive = matches!(
+        format.protocol,
+        Some(Protocol::Https) | Some(Protocol::Http)
+    );
+
+    audio_only && progressive && format.url.is_some()
+}
+
+fn expires_at(url: &str) -> Option<i64> {
+    Url::parse(url)
+        .ok()?
+        .query_pairs()
+        .find(|(key, _)| key == "expire")
+        .and_then(|(_, value)| value.parse().ok())
 }
 
 async fn self_update(path: PathBuf) -> Result<()> {
