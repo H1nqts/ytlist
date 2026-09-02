@@ -24,6 +24,18 @@ const EXPIRY_MARGIN_SEC = 60
 /** Assumed lifetime when the stream URL carries no `expire` parameter. */
 const FALLBACK_TTL_SEC = 3600
 
+const PRELOAD_COUNT = 2
+
+interface CachedStream {
+  url: string
+  expiresAt: number
+}
+
+function isFresh(cached: CachedStream | undefined): cached is CachedStream {
+  if (!cached) return false
+  return cached.expiresAt - Date.now() / 1000 > EXPIRY_MARGIN_SEC
+}
+
 interface PlayerContextValue {
   state: PlayerState
   currentTrack: Track | null
@@ -59,6 +71,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = React.useReducer(playerReducer, initialPlayerState)
   const [streamLoading, setStreamLoading] = React.useState(false)
   const [streamError, setStreamError] = React.useState<string | null>(null)
+  const [srcReadySeq, setSrcReadySeq] = React.useState(0)
   const [ytdlp, setYtdlp] = React.useState<YtdlpStatus>({
     state: "checking",
     message: null,
@@ -71,9 +84,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     audioRef.current.preload = "auto"
   }
 
-  const streamCache = React.useRef(
-    new Map<string, { url: string; expiresAt: number }>()
-  )
+  const streamCache = React.useRef(new Map<string, CachedStream>())
+  const inFlight = React.useRef(new Map<string, Promise<string>>())
   const loadSeq = React.useRef(0)
   const retriedTracks = React.useRef(new Set<string>())
 
@@ -189,18 +201,31 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const resolveStream = React.useCallback(
     async (trackId: string, force: boolean) => {
-      const cached = streamCache.current.get(trackId)
-      const now = Date.now() / 1000
-      if (!force && cached && cached.expiresAt - now > EXPIRY_MARGIN_SEC) {
-        return cached.url
+      if (!force) {
+        const cached = streamCache.current.get(trackId)
+        if (isFresh(cached)) return cached.url
+
+        const pending = inFlight.current.get(trackId)
+        if (pending) return pending
       }
 
-      const info = await streamResolve(trackId)
-      streamCache.current.set(trackId, {
-        url: info.url,
-        expiresAt: info.expires_at ?? now + FALLBACK_TTL_SEC,
-      })
-      return info.url
+      const request: Promise<string> = streamResolve(trackId)
+        .then((info) => {
+          streamCache.current.set(trackId, {
+            url: info.url,
+            expiresAt: info.expires_at ?? Date.now() / 1000 + FALLBACK_TTL_SEC,
+          })
+          return info.url
+        })
+        .finally(() => {
+          // A later forced resolve may have replaced the entry; leave that one alone.
+          if (inFlight.current.get(trackId) === request) {
+            inFlight.current.delete(trackId)
+          }
+        })
+
+      inFlight.current.set(trackId, request)
+      return request
     },
     []
   )
@@ -265,10 +290,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     audio.load()
 
     const cached = streamCache.current.get(trackId)
-    const now = Date.now() / 1000
-    if (cached && cached.expiresAt - now > EXPIRY_MARGIN_SEC) {
+    if (isFresh(cached)) {
       audio.src = cached.url
       audio.load()
+      setSrcReadySeq(seq)
       return
     }
 
@@ -279,6 +304,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setStreamLoading(false)
         audio.src = url
         audio.load()
+        setSrcReadySeq(seq)
       })
       .catch((err) => {
         if (loadSeq.current !== seq) return
@@ -288,6 +314,29 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         toast.error("Couldn't play this track", { description: String(err) })
       })
   }, [trackId, resolveStream])
+
+  // Resolve the next few queued tracks ahead of time, so switching to them hits
+  // the cache instead of waiting on yt-dlp.
+  React.useEffect(() => {
+    if (srcReadySeq === 0) return
+
+    let cancelled = false
+    const upcoming = state.queue.slice(0, PRELOAD_COUNT)
+
+    void (async () => {
+      for (const id of upcoming) {
+        if (cancelled) return
+        if (isFresh(streamCache.current.get(id))) continue
+        // Preload failures stay silent: the load effect retries and surfaces
+        // the error if the track is actually played.
+        await resolveStream(id, false).catch(() => {})
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [srcReadySeq, state.queue, resolveStream])
 
   React.useEffect(() => {
     const audio = audioRef.current
