@@ -13,6 +13,7 @@ use youtube_dl::{download_yt_dlp, Format, Protocol, SingleVideo, YoutubeDl};
 pub const STATUS_EVENT: &str = "ytdlp://status";
 
 const AUDIO_FORMAT: &str = "bestaudio";
+const PLAYER_CLIENTS: &str = "youtube:player_client=tv_embedded,web,visionos";
 const SOCKET_TIMEOUT: &str = "15";
 const PROCESS_TIMEOUT: Duration = Duration::from_secs(60);
 const VIDEO_ID_LEN: usize = 11;
@@ -145,6 +146,8 @@ impl Manager {
             .youtube_dl_path(bin)
             .format(AUDIO_FORMAT)
             .extra_arg("--no-playlist")
+            .extra_arg("--extractor-args")
+            .extra_arg(PLAYER_CLIENTS)
             .socket_timeout(SOCKET_TIMEOUT)
             .process_timeout(PROCESS_TIMEOUT)
             .run_async()
