@@ -17,12 +17,10 @@ export type PlayerAction =
   | { type: "SET_DURATION"; durationSec: number }
   | { type: "NEXT" }
   | { type: "PREV" }
-  | { type: "SEEK"; progressSec: number }
   | { type: "SET_VOLUME"; volume: number }
   | { type: "TOGGLE_MUTE" }
   | { type: "TOGGLE_SHUFFLE" }
   | { type: "CYCLE_REPEAT" }
-  | { type: "PROGRESS"; progressSec: number }
   | { type: "PAUSE" }
   | { type: "SET_QUEUE"; queue: string[] }
   | { type: "ENQUEUE"; trackId: string }
@@ -33,7 +31,6 @@ export const initialPlayerState: PlayerState = {
   isPlaying: false,
   currentTrackId: null,
   currentPlaylistId: null,
-  progressSec: 0,
   durationSec: 0,
   volume: 0.8,
   muted: false,
@@ -98,7 +95,6 @@ export function playerReducer(
         currentTrackId: action.trackId,
         currentPlaylistId: action.playlistId,
         durationSec: action.durationSec,
-        progressSec: 0,
         queue,
         queueIndex: index,
       }
@@ -121,7 +117,6 @@ export function playerReducer(
           ...state,
           currentTrackId: state.queue[0],
           queueIndex: 0,
-          progressSec: 0,
           isPlaying: true,
         }
       }
@@ -129,31 +124,20 @@ export function playerReducer(
         ...state,
         currentTrackId: state.queue[next],
         queueIndex: next,
-        progressSec: 0,
         isPlaying: true,
       }
     }
 
     case "PREV": {
-      if (state.progressSec > RESTART_THRESHOLD_SEC) {
-        return { ...state, progressSec: 0 }
-      }
       const prev = state.queueIndex - 1
-      if (prev < 0) return { ...state, progressSec: 0 }
+      if (prev < 0) return state
       return {
         ...state,
         currentTrackId: state.queue[prev],
         queueIndex: prev,
-        progressSec: 0,
         isPlaying: true,
       }
     }
-
-    case "SEEK":
-      return {
-        ...state,
-        progressSec: Math.min(action.progressSec, state.durationSec),
-      }
 
     case "SET_VOLUME":
       return {
@@ -170,10 +154,6 @@ export function playerReducer(
 
     case "CYCLE_REPEAT":
       return { ...state, repeat: nextRepeat[state.repeat] }
-
-    case "PROGRESS":
-      if (!state.currentTrackId) return state
-      return { ...state, progressSec: action.progressSec }
 
     case "PAUSE":
       return { ...state, isPlaying: false }
@@ -208,7 +188,6 @@ export function playerReducer(
         currentTrackId: action.trackId,
         durationSec: action.durationSec,
         queueIndex: idx,
-        progressSec: 0,
         isPlaying: true,
       }
     }

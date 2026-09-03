@@ -1,12 +1,13 @@
 import { formatDuration } from "@/lib/format"
 import { Slider } from "@/components/ui/slider"
-import { usePlayer } from "@/hooks/use-player"
+import { usePlayer, usePlayerProgress } from "@/hooks/use-player"
 
 export function SeekBar() {
-  const { state, currentTrack, seek } = usePlayer()
+  const { currentTrack, seek } = usePlayer()
+  const { progressSec, durationSec } = usePlayerProgress()
 
-  const duration = currentTrack ? state.durationSec : 0
-  const progress = currentTrack ? state.progressSec : 0
+  const duration = currentTrack ? durationSec : 0
+  const progress = currentTrack ? progressSec : 0
 
   return (
     <div className="flex w-full items-center gap-2">

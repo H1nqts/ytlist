@@ -82,7 +82,13 @@ interface PlayerContextValue {
   jumpInQueue: (trackId: string) => void
 }
 
+interface PlayerProgressValue {
+  progressSec: number
+  durationSec: number
+}
+
 const PlayerContext = React.createContext<PlayerContextValue | null>(null)
+const PlayerProgressContext = React.createContext<PlayerProgressValue | null>(null)
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const library = React.useContext(LibraryContext)
@@ -92,6 +98,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const { getTrack, getPlaylist } = library
 
   const [state, dispatch] = React.useReducer(playerReducer, initialPlayerState)
+  const [progressSec, setProgressSec] = React.useState(0)
   const [streamLoading, setStreamLoading] = React.useState(false)
   const [streamError, setStreamError] = React.useState<string | null>(null)
   const [srcReadySeq, setSrcReadySeq] = React.useState(0)
@@ -158,6 +165,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const audio = getAudio()
     if (audio && audio.currentTime > RESTART_THRESHOLD_SEC) {
       audio.currentTime = 0
+      setProgressSec(0)
+      return
     }
     dispatch({ type: "PREV" })
   }, [])
@@ -165,9 +174,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const seek = React.useCallback((progressSec: number) => {
     const audio = getAudio()
     if (audio && Number.isFinite(audio.duration)) {
-      audio.currentTime = Math.min(progressSec, audio.duration)
+      const next = Math.min(progressSec, audio.duration)
+      audio.currentTime = next
+      setProgressSec(next)
     }
-    dispatch({ type: "SEEK", progressSec })
   }, [])
   const setVolume = React.useCallback(
     (volume: number) => dispatch({ type: "SET_VOLUME", volume }),
@@ -247,8 +257,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const audio = getAudio()
     if (!audio) return
 
-    const onTimeUpdate = () =>
-      dispatch({ type: "PROGRESS", progressSec: audio.currentTime })
+    const onTimeUpdate = () => setProgressSec(audio.currentTime)
 
     const onLoadedMetadata = () => {
       if (Number.isFinite(audio.duration)) {
@@ -304,6 +313,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const seq = ++loadSeq.current
     retriedTracks.current.clear()
     setStreamError(null)
+    setProgressSec(0)
 
     // Stop the outgoing track now; resolving the next stream can take seconds.
     audio.pause()
@@ -468,8 +478,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     ]
   )
 
-  return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>
+  const progressValue = React.useMemo(
+    () => ({ progressSec, durationSec: state.durationSec }),
+    [progressSec, state.durationSec]
+  )
+
+  return (
+    <PlayerContext.Provider value={value}>
+      <PlayerProgressContext.Provider value={progressValue}>
+        {children}
+      </PlayerProgressContext.Provider>
+    </PlayerContext.Provider>
+  )
 }
 
-export { PlayerContext }
-export type { PlayerContextValue }
+export { PlayerContext, PlayerProgressContext }
+export type { PlayerContextValue, PlayerProgressValue }

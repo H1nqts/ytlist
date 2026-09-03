@@ -36,8 +36,6 @@ export interface PlayerState {
   isPlaying: boolean
   currentTrackId: string | null
   currentPlaylistId: number | null
-  /** Playback position, in seconds. */
-  progressSec: number
   /** Duration of the current track, cached for the seek bar. */
   durationSec: number
   /** 0..1 */
