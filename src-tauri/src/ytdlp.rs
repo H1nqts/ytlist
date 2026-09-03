@@ -16,6 +16,8 @@ const AUDIO_FORMAT: &str = "bestaudio";
 const PLAYER_CLIENTS: &str = "youtube:player_client=tv_embedded,web,visionos";
 const SOCKET_TIMEOUT: &str = "15";
 const PROCESS_TIMEOUT: Duration = Duration::from_secs(60);
+const UPDATE_TIMEOUT: Duration = Duration::from_secs(120);
+const UPDATE_POLL_INTERVAL: Duration = Duration::from_millis(200);
 const VIDEO_ID_LEN: usize = 11;
 
 const BIN_NAME: &str = if cfg!(windows) {
@@ -257,20 +259,40 @@ fn expires_at(url: &str) -> Option<i64> {
 
 async fn self_update(path: PathBuf) -> Result<()> {
     tauri::async_runtime::spawn_blocking(move || {
-        let output = command(&path)
+        let mut child = command(&path)
             .arg("--update")
-            .output()
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
             .context("failed to run yt-dlp --update")?;
 
-        if output.status.success() {
-            Ok(())
-        } else {
-            Err(anyhow!(
-                "yt-dlp --update exited with {}: {}",
-                output.status,
-                String::from_utf8_lossy(output.stderr.trim_ascii_end())
-            ))
+        let deadline = std::time::Instant::now() + UPDATE_TIMEOUT;
+        let status = loop {
+            match child.try_wait().context("failed to poll yt-dlp --update")? {
+                Some(status) => break status,
+                None if std::time::Instant::now() >= deadline => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    bail!("yt-dlp --update timed out");
+                }
+                None => std::thread::sleep(UPDATE_POLL_INTERVAL),
+            }
+        };
+
+        if status.success() {
+            return Ok(());
         }
+
+        let mut stderr = String::new();
+        if let Some(mut reader) = child.stderr.take() {
+            use std::io::Read as _;
+            let _ = reader.read_to_string(&mut stderr);
+        }
+        Err(anyhow!(
+            "yt-dlp --update exited with {}: {}",
+            status,
+            stderr.trim_end()
+        ))
     })
     .await
     .context("yt-dlp --update task failed")?
