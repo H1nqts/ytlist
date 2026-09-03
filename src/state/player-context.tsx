@@ -26,6 +26,8 @@ const FALLBACK_TTL_SEC = 3600
 
 const PRELOAD_COUNT = 2
 
+const STREAM_CACHE_MAX = 64
+
 interface CachedStream {
   url: string
   expiresAt: number
@@ -34,6 +36,27 @@ interface CachedStream {
 function isFresh(cached: CachedStream | undefined): cached is CachedStream {
   if (!cached) return false
   return cached.expiresAt - Date.now() / 1000 > EXPIRY_MARGIN_SEC
+}
+
+function cacheStream(
+  cache: Map<string, CachedStream>,
+  trackId: string,
+  entry: CachedStream
+) {
+  // Re-insert to move the entry to the end: Map iterates in insertion order,
+  // so the oldest key is the first one evicted.
+  cache.delete(trackId)
+  cache.set(trackId, entry)
+
+  for (const [id, cached] of cache) {
+    if (cache.size <= STREAM_CACHE_MAX) break
+    if (id !== trackId && !isFresh(cached)) cache.delete(id)
+  }
+  while (cache.size > STREAM_CACHE_MAX) {
+    const oldest = cache.keys().next().value
+    if (oldest === undefined || oldest === trackId) break
+    cache.delete(oldest)
+  }
 }
 
 interface PlayerContextValue {
@@ -203,7 +226,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     async (trackId: string, force: boolean) => {
       if (!force) {
         const cached = streamCache.current.get(trackId)
-        if (isFresh(cached)) return cached.url
+        if (isFresh(cached)) {
+          cacheStream(streamCache.current, trackId, cached)
+          return cached.url
+        }
 
         const pending = inFlight.current.get(trackId)
         if (pending) return pending
@@ -211,7 +237,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
       const request: Promise<string> = streamResolve(trackId)
         .then((info) => {
-          streamCache.current.set(trackId, {
+          cacheStream(streamCache.current, trackId, {
             url: info.url,
             expiresAt: info.expires_at ?? Date.now() / 1000 + FALLBACK_TTL_SEC,
           })
