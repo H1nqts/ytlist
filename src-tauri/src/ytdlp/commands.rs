@@ -22,5 +22,5 @@ pub async fn stream_resolve(
         .ytdlp
         .resolve_stream(&video_id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| format!("{e:#}"))
 }
