@@ -21,6 +21,7 @@ interface PlayerBarProps {
 
 export function PlayerBar({ onToggleQueue, queueOpen }: PlayerBarProps) {
   const { state } = usePlayer()
+  const upcomingCount = state.queue.length - (state.queueIndex + 1)
 
   return (
     <div className="grid h-20 grid-cols-[1fr_auto_1fr] items-center gap-4 px-4">
@@ -49,12 +50,12 @@ export function PlayerBar({ onToggleQueue, queueOpen }: PlayerBarProps) {
               className={cn("relative", queueOpen && "bg-muted text-foreground")}
             >
               <ListVideoIcon />
-              {state.queue.length > 0 && (
+              {upcomingCount > 0 && (
                 <Badge
                   variant="default"
                   className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-1 text-[10px]"
                 >
-                  {state.queue.length}
+                  {upcomingCount}
                 </Badge>
               )}
             </Button>

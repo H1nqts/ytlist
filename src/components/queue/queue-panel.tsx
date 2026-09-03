@@ -20,6 +20,7 @@ export function QueuePanel({ open, onOpenChange }: QueuePanelProps) {
   const { getTrack } = useLibrary()
 
   const queueTracks = state.queue
+    .slice(state.queueIndex + 1)
     .map((id) => getTrack(id))
     .filter((t): t is NonNullable<typeof t> => Boolean(t))
 

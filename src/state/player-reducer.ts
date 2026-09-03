@@ -40,7 +40,7 @@ export const initialPlayerState: PlayerState = {
   shuffle: false,
   repeat: "off",
   queue: [],
-  history: [],
+  queueIndex: -1,
 }
 
 const nextRepeat: Record<RepeatMode, RepeatMode> = {
@@ -61,18 +61,22 @@ function shuffleExcept(ids: string[], keep: string, seed: number): string[] {
   return rest
 }
 
-/** Build the upcoming queue for a track within its playlist. */
+/** Build the playback order for a track within its playlist. */
 function buildQueue(
   playlistTrackIds: string[],
   currentId: string,
   shuffle: boolean
-): string[] {
+): { queue: string[]; index: number } {
   if (shuffle) {
-    return shuffleExcept(playlistTrackIds, currentId, currentId.length * 7 + 3)
+    const rest = shuffleExcept(playlistTrackIds, currentId, currentId.length * 7 + 3)
+    return { queue: [currentId, ...rest], index: 0 }
   }
   const idx = playlistTrackIds.indexOf(currentId)
-  if (idx === -1) return playlistTrackIds.filter((id) => id !== currentId)
-  return playlistTrackIds.slice(idx + 1)
+  if (idx === -1) {
+    const rest = playlistTrackIds.filter((id) => id !== currentId)
+    return { queue: [currentId, ...rest], index: 0 }
+  }
+  return { queue: playlistTrackIds, index: idx }
 }
 
 export function playerReducer(
@@ -82,6 +86,11 @@ export function playerReducer(
   switch (action.type) {
     case "PLAY_TRACK": {
       const shuffle = action.shuffle ?? state.shuffle
+      const { queue, index } = buildQueue(
+        action.playlistTrackIds,
+        action.trackId,
+        shuffle
+      )
       return {
         ...state,
         isPlaying: true,
@@ -90,10 +99,8 @@ export function playerReducer(
         currentPlaylistId: action.playlistId,
         durationSec: action.durationSec,
         progressSec: 0,
-        queue: buildQueue(action.playlistTrackIds, action.trackId, shuffle),
-        history: state.currentTrackId
-          ? [...state.history, state.currentTrackId]
-          : state.history,
+        queue,
+        queueIndex: index,
       }
     }
 
@@ -105,20 +112,25 @@ export function playerReducer(
       return { ...state, durationSec: action.durationSec }
 
     case "NEXT": {
-      const [head, ...rest] = state.queue
-      if (!head) {
-        // Nothing queued — stop at end ("repeat all" re-seeding lives in the provider).
-        return { ...state, isPlaying: false }
+      const next = state.queueIndex + 1
+      if (next >= state.queue.length) {
+        if (state.repeat !== "all" || state.queue.length === 0) {
+          return { ...state, isPlaying: false }
+        }
+        return {
+          ...state,
+          currentTrackId: state.queue[0],
+          queueIndex: 0,
+          progressSec: 0,
+          isPlaying: true,
+        }
       }
       return {
         ...state,
-        currentTrackId: head,
-        queue: rest,
+        currentTrackId: state.queue[next],
+        queueIndex: next,
         progressSec: 0,
         isPlaying: true,
-        history: state.currentTrackId
-          ? [...state.history, state.currentTrackId]
-          : state.history,
       }
     }
 
@@ -126,15 +138,12 @@ export function playerReducer(
       if (state.progressSec > RESTART_THRESHOLD_SEC) {
         return { ...state, progressSec: 0 }
       }
-      const prev = state.history[state.history.length - 1]
-      if (!prev) return { ...state, progressSec: 0 }
+      const prev = state.queueIndex - 1
+      if (prev < 0) return { ...state, progressSec: 0 }
       return {
         ...state,
-        currentTrackId: prev,
-        history: state.history.slice(0, -1),
-        queue: state.currentTrackId
-          ? [state.currentTrackId, ...state.queue]
-          : state.queue,
+        currentTrackId: state.queue[prev],
+        queueIndex: prev,
         progressSec: 0,
         isPlaying: true,
       }
@@ -170,33 +179,37 @@ export function playerReducer(
       return { ...state, isPlaying: false }
 
     case "SET_QUEUE":
-      return { ...state, queue: action.queue }
+      return {
+        ...state,
+        queue: action.queue,
+        queueIndex: Math.min(state.queueIndex, action.queue.length - 1),
+      }
 
     case "ENQUEUE":
       if (state.queue.includes(action.trackId)) return state
       return { ...state, queue: [...state.queue, action.trackId] }
 
-    case "REMOVE_FROM_QUEUE":
+    case "REMOVE_FROM_QUEUE": {
+      const idx = state.queue.indexOf(action.trackId)
+      // Removing the current track would leave the cursor pointing elsewhere.
+      if (idx === -1 || idx === state.queueIndex) return state
       return {
         ...state,
         queue: state.queue.filter((id) => id !== action.trackId),
+        queueIndex: idx < state.queueIndex ? state.queueIndex - 1 : state.queueIndex,
       }
+    }
 
     case "JUMP_IN_QUEUE": {
       const idx = state.queue.indexOf(action.trackId)
       if (idx === -1) return state
-      const skipped = state.queue.slice(0, idx)
-      const rest = state.queue.slice(idx + 1)
       return {
         ...state,
         currentTrackId: action.trackId,
         durationSec: action.durationSec,
-        queue: rest,
+        queueIndex: idx,
         progressSec: 0,
         isPlaying: true,
-        history: state.currentTrackId
-          ? [...state.history, ...skipped, state.currentTrackId]
-          : [...state.history, ...skipped],
       }
     }
 

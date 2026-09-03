@@ -147,29 +147,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     [getPlaylist]
   )
 
-  const next = React.useCallback(() => {
-    // If the queue is empty but repeat is "all", loop back to the start of the
-    // current playlist instead of stopping.
-    if (
-      state.queue.length === 0 &&
-      state.repeat === "all" &&
-      state.currentPlaylistId
-    ) {
-      const playlist = getPlaylist(state.currentPlaylistId)
-      if (playlist && playlist.tracks.length > 0) {
-        const first = playlist.tracks[0]
-        dispatch({
-          type: "PLAY_TRACK",
-          trackId: first.id,
-          playlistId: playlist.id,
-          durationSec: first.durationSec,
-          playlistTrackIds: playlist.tracks.map((t) => t.id),
-        })
-        return
-      }
-    }
-    dispatch({ type: "NEXT" })
-  }, [state.queue.length, state.repeat, state.currentPlaylistId, getPlaylist])
+  const next = React.useCallback(() => dispatch({ type: "NEXT" }), [])
 
   const prev = React.useCallback(() => {
     // PREV restarts the current track past RESTART_THRESHOLD_SEC; rewind the
@@ -347,7 +325,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (srcReadySeq === 0) return
 
     let cancelled = false
-    const upcoming = state.queue.slice(0, PRELOAD_COUNT)
+    const upcoming = state.queue.slice(
+      state.queueIndex + 1,
+      state.queueIndex + 1 + PRELOAD_COUNT
+    )
 
     void (async () => {
       for (const id of upcoming) {
@@ -362,7 +343,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [srcReadySeq, state.queue, resolveStream])
+  }, [srcReadySeq, state.queue, state.queueIndex, resolveStream])
 
   React.useEffect(() => {
     const audio = audioRef.current

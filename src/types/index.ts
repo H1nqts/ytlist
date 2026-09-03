@@ -45,10 +45,10 @@ export interface PlayerState {
   muted: boolean
   shuffle: boolean
   repeat: RepeatMode
-  /** Upcoming track ids (editable from the queue panel). */
+  /** Full playback order (editable from the queue panel). */
   queue: string[]
-  /** Recently played track ids, used for "previous". */
-  history: string[]
+  /** -1 when nothing is playing. */
+  queueIndex: number
 }
 
 export interface LibraryState {
