@@ -101,10 +101,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   })
 
   const audioRef = React.useRef<HTMLAudioElement | null>(null)
-  if (audioRef.current === null && typeof Audio !== "undefined") {
-    // No crossOrigin: googlevideo sends no CORS headers, so a CORS load fails.
-    audioRef.current = new Audio()
-    audioRef.current.preload = "auto"
+  const getAudio = () => {
+    if (audioRef.current === null && typeof Audio !== "undefined") {
+      // No crossOrigin: googlevideo sends no CORS headers, so a CORS load fails.
+      audioRef.current = new Audio()
+      audioRef.current.preload = "auto"
+    }
+    return audioRef.current
   }
 
   const streamCache = React.useRef(new Map<string, CachedStream>())
@@ -152,7 +155,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const prev = React.useCallback(() => {
     // PREV restarts the current track past RESTART_THRESHOLD_SEC; rewind the
     // element too, or the next timeupdate reports the old position back.
-    const audio = audioRef.current
+    const audio = getAudio()
     if (audio && audio.currentTime > RESTART_THRESHOLD_SEC) {
       audio.currentTime = 0
     }
@@ -160,7 +163,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [])
   const togglePlay = React.useCallback(() => dispatch({ type: "TOGGLE_PLAY" }), [])
   const seek = React.useCallback((progressSec: number) => {
-    const audio = audioRef.current
+    const audio = getAudio()
     if (audio && Number.isFinite(audio.duration)) {
       audio.currentTime = Math.min(progressSec, audio.duration)
     }
@@ -236,10 +239,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   // Latest values for the audio listeners, which are bound once.
   const handlers = React.useRef({ next, repeat: state.repeat })
-  handlers.current = { next, repeat: state.repeat }
+  React.useEffect(() => {
+    handlers.current = { next, repeat: state.repeat }
+  }, [next, state.repeat])
 
   React.useEffect(() => {
-    const audio = audioRef.current
+    const audio = getAudio()
     if (!audio) return
 
     const onTimeUpdate = () =>
@@ -271,8 +276,20 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  // An unreleased element keeps buffering the stream.
   React.useEffect(() => {
-    const audio = audioRef.current
+    return () => {
+      const audio = audioRef.current
+      if (!audio) return
+      audio.pause()
+      audio.removeAttribute("src")
+      audio.load()
+      audioRef.current = null
+    }
+  }, [])
+
+  React.useEffect(() => {
+    const audio = getAudio()
     if (!audio) return
     audio.volume = state.volume
     audio.muted = state.muted
@@ -281,7 +298,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const trackId = state.currentTrackId
 
   React.useEffect(() => {
-    const audio = audioRef.current
+    const audio = getAudio()
     if (!audio || !trackId) return
 
     const seq = ++loadSeq.current
@@ -346,7 +363,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [srcReadySeq, state.queue, state.queueIndex, resolveStream])
 
   React.useEffect(() => {
-    const audio = audioRef.current
+    const audio = getAudio()
     if (!audio || !state.currentTrackId) return
 
     if (!state.isPlaying) {
@@ -365,7 +382,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   // A stream URL can die mid-playback; re-resolve once before giving up.
   React.useEffect(() => {
-    const audio = audioRef.current
+    const audio = getAudio()
     if (!audio) return
 
     const onError = () => {
