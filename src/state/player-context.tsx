@@ -302,7 +302,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (!audio || !trackId) return
 
     const seq = ++loadSeq.current
-    retriedTracks.current.delete(trackId)
+    retriedTracks.current.clear()
     setStreamError(null)
 
     // Stop the outgoing track now; resolving the next stream can take seconds.
