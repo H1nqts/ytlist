@@ -26,7 +26,8 @@ function MarqueeText({
   const [overflow, setOverflow] = React.useState(0)
   const [active, setActive] = React.useState(false)
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
+    if (!active) return
     const viewport = viewportRef.current
     const text = textRef.current
     if (!viewport || !text) return
@@ -42,7 +43,7 @@ function MarqueeText({
     observer.observe(viewport)
     observer.observe(text)
     return () => observer.disconnect()
-  }, [children])
+  }, [active, children])
 
   React.useEffect(() => {
     if (!group) return
