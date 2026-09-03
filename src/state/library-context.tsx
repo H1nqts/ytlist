@@ -252,15 +252,17 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     [state.playlists]
   )
 
+  const trackIndex = React.useMemo(() => {
+    const index = new Map<string, Track>()
+    for (const p of state.playlists) {
+      for (const t of p.tracks) index.set(t.id, t)
+    }
+    return index
+  }, [state.playlists])
+
   const getTrack = React.useCallback(
-    (trackId: string) => {
-      for (const p of state.playlists) {
-        const t = p.tracks.find((tr) => tr.id === trackId)
-        if (t) return t
-      }
-      return undefined
-    },
-    [state.playlists]
+    (trackId: string) => trackIndex.get(trackId),
+    [trackIndex]
   )
 
   const value = React.useMemo<LibraryContextValue>(

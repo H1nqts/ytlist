@@ -1,3 +1,4 @@
+import * as React from "react"
 import { Dialog as DialogPrimitive } from "radix-ui"
 import { ListVideoIcon, XIcon } from "lucide-react"
 
@@ -19,10 +20,14 @@ export function QueuePanel({ open, onOpenChange }: QueuePanelProps) {
   const { currentTrack, state } = usePlayer()
   const { getTrack } = useLibrary()
 
-  const queueTracks = state.queue
-    .slice(state.queueIndex + 1)
-    .map((id) => getTrack(id))
-    .filter((t): t is NonNullable<typeof t> => Boolean(t))
+  const queueTracks = React.useMemo(
+    () =>
+      state.queue
+        .slice(state.queueIndex + 1)
+        .map((id) => getTrack(id))
+        .filter((t): t is NonNullable<typeof t> => Boolean(t)),
+    [state.queue, state.queueIndex, getTrack]
+  )
 
   const isEmpty = !currentTrack && queueTracks.length === 0
 
