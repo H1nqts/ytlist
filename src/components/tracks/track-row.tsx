@@ -60,7 +60,7 @@ export function TrackRow({ track, index, playlistId }: TrackRowProps) {
         if (e.key === "Enter") play()
       }}
       className={cn(
-        "group/row flex cursor-default items-center gap-3 rounded-lg px-3 py-2 outline-none transition-colors",
+        "group/row flex h-14 cursor-default items-center gap-3 rounded-lg px-3 py-2 outline-none transition-colors",
         "hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
         isCurrent && "bg-accent"
       )}
