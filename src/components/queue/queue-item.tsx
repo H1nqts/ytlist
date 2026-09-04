@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Thumbnail } from "@/components/ui/thumbnail"
 import { MarqueeText } from "@/components/ui/marquee-text"
 import { usePlayer } from "@/hooks/use-player"
+import { useSettings } from "@/hooks/use-settings"
 
 interface QueueItemProps {
   track: Track
@@ -16,12 +17,26 @@ interface QueueItemProps {
 
 export function QueueItem({ track, current = false }: QueueItemProps) {
   const { state, jumpInQueue, removeFromQueue } = usePlayer()
+  const { playActivation } = useSettings()
+
+  function jump() {
+    jumpInQueue(track.id)
+  }
 
   return (
     <div
+      role={current ? undefined : "button"}
+      tabIndex={current ? undefined : 0}
+      onClick={!current && playActivation === "single" ? jump : undefined}
+      onDoubleClick={!current && playActivation === "double" ? jump : undefined}
+      onKeyDown={(e) => {
+        if (!current && e.key === "Enter") jump()
+      }}
       className={cn(
-        "group/qitem flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors",
-        current ? "bg-accent" : "hover:bg-accent"
+        "group/qitem flex items-center gap-3 rounded-lg px-2 py-1.5 outline-none transition-colors",
+        current
+          ? "bg-accent"
+          : "cursor-default hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
       )}
       data-marquee-group
     >
@@ -62,7 +77,10 @@ export function QueueItem({ track, current = false }: QueueItemProps) {
               size="icon-xs"
               variant="ghost"
               aria-label={`Play ${track.title} now`}
-              onClick={() => jumpInQueue(track.id)}
+              onClick={(e) => {
+                e.stopPropagation()
+                jump()
+              }}
             >
               <PlayIcon />
             </Button>
@@ -70,7 +88,10 @@ export function QueueItem({ track, current = false }: QueueItemProps) {
               size="icon-xs"
               variant="ghost"
               aria-label="Remove from queue"
-              onClick={() => removeFromQueue(track.id)}
+              onClick={(e) => {
+                e.stopPropagation()
+                removeFromQueue(track.id)
+              }}
             >
               <XIcon />
             </Button>
