@@ -121,6 +121,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const inFlight = React.useRef(new Map<string, Promise<string>>())
   const loadSeq = React.useRef(0)
   const retriedTracks = React.useRef(new Set<string>())
+  const suppressPause = React.useRef(false)
 
   React.useEffect(() => {
     let active = true
@@ -248,10 +249,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   )
 
   // Latest values for the audio listeners, which are bound once.
-  const handlers = React.useRef({ next, repeat: state.repeat })
+  const handlers = React.useRef({
+    next,
+    repeat: state.repeat,
+    isPlaying: state.isPlaying,
+  })
   React.useEffect(() => {
-    handlers.current = { next, repeat: state.repeat }
-  }, [next, state.repeat])
+    handlers.current = { next, repeat: state.repeat, isPlaying: state.isPlaying }
+  }, [next, state.repeat, state.isPlaying])
 
   React.useEffect(() => {
     const audio = getAudio()
@@ -274,14 +279,27 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       handlers.current.next()
     }
 
+    const onPlay = () => {
+      if (!handlers.current.isPlaying) dispatch({ type: "TOGGLE_PLAY" })
+    }
+
+    const onPause = () => {
+      if (suppressPause.current) return
+      if (handlers.current.isPlaying && !audio.ended) dispatch({ type: "PAUSE" })
+    }
+
     audio.addEventListener("timeupdate", onTimeUpdate)
     audio.addEventListener("loadedmetadata", onLoadedMetadata)
     audio.addEventListener("ended", onEnded)
+    audio.addEventListener("play", onPlay)
+    audio.addEventListener("pause", onPause)
 
     return () => {
       audio.removeEventListener("timeupdate", onTimeUpdate)
       audio.removeEventListener("loadedmetadata", onLoadedMetadata)
       audio.removeEventListener("ended", onEnded)
+      audio.removeEventListener("play", onPlay)
+      audio.removeEventListener("pause", onPause)
     }
   }, [])
 
@@ -316,9 +334,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setProgressSec(0)
 
     // Stop the outgoing track now; resolving the next stream can take seconds.
+    suppressPause.current = true
     audio.pause()
     audio.removeAttribute("src")
     audio.load()
+    queueMicrotask(() => {
+      suppressPause.current = false
+    })
 
     const cached = streamCache.current.get(trackId)
     if (isFresh(cached)) {
