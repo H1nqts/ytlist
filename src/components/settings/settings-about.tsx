@@ -1,6 +1,8 @@
 import { ListMusicIcon } from "lucide-react"
 
 import { Separator } from "@/components/ui/separator"
+import { getVersion } from '@tauri-apps/api/app'
+import { useEffect, useState } from "react";
 
 const LICENSES: { license: string; packages: string }[] = [
   {
@@ -44,6 +46,12 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 export function SettingsAbout() {
+  const [version, setVersion] = useState<string | null>(null)
+
+  useEffect(() => {
+    getVersion().then(setVersion).catch(() => setVersion(null))
+  }, [])
+
   return (
     <div className="flex flex-col items-center gap-3 py-6 text-center">
       <div className="flex size-14 items-center justify-center rounded-xl bg-primary text-primary-foreground">
@@ -51,7 +59,7 @@ export function SettingsAbout() {
       </div>
       <div>
         <p className="font-heading text-lg font-semibold">ytlist</p>
-        <p className="text-xs text-muted-foreground">Version 0.1.0</p>
+        <p className="text-xs text-muted-foreground">Version {version}</p>
       </div>
       <p className="max-w-xs text-xs text-muted-foreground">
         A desktop client for browsing and playing your YouTube playlists.
