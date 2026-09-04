@@ -12,6 +12,7 @@ export type PlayerAction =
       /** Ordered ids of the playlist this track belongs to. */
       playlistTrackIds: string[]
       shuffle?: boolean
+      seed: number
     }
   | { type: "TOGGLE_PLAY" }
   | { type: "SET_DURATION"; durationSec: number }
@@ -19,7 +20,7 @@ export type PlayerAction =
   | { type: "PREV" }
   | { type: "SET_VOLUME"; volume: number }
   | { type: "TOGGLE_MUTE" }
-  | { type: "TOGGLE_SHUFFLE" }
+  | { type: "TOGGLE_SHUFFLE"; playlistTrackIds: string[]; seed: number }
   | { type: "CYCLE_REPEAT" }
   | { type: "PAUSE" }
   | { type: "SET_QUEUE"; queue: string[] }
@@ -48,7 +49,7 @@ const nextRepeat: Record<RepeatMode, RepeatMode> = {
 
 function shuffleExcept(ids: string[], keep: string, seed: number): string[] {
   const rest = ids.filter((id) => id !== keep)
-  // Deterministic Fisher–Yates using a tiny LCG (avoids Math.random()).
+  // Fisher–Yates driven by a tiny LCG, so the reducer stays pure.
   let s = seed >>> 0 || 1
   for (let i = rest.length - 1; i > 0; i--) {
     s = (s * 1664525 + 1013904223) >>> 0
@@ -62,10 +63,11 @@ function shuffleExcept(ids: string[], keep: string, seed: number): string[] {
 function buildQueue(
   playlistTrackIds: string[],
   currentId: string,
-  shuffle: boolean
+  shuffle: boolean,
+  seed: number
 ): { queue: string[]; index: number } {
   if (shuffle) {
-    const rest = shuffleExcept(playlistTrackIds, currentId, currentId.length * 7 + 3)
+    const rest = shuffleExcept(playlistTrackIds, currentId, seed)
     return { queue: [currentId, ...rest], index: 0 }
   }
   const idx = playlistTrackIds.indexOf(currentId)
@@ -86,7 +88,8 @@ export function playerReducer(
       const { queue, index } = buildQueue(
         action.playlistTrackIds,
         action.trackId,
-        shuffle
+        shuffle,
+        action.seed
       )
       return {
         ...state,
@@ -149,8 +152,17 @@ export function playerReducer(
     case "TOGGLE_MUTE":
       return { ...state, muted: !state.muted }
 
-    case "TOGGLE_SHUFFLE":
-      return { ...state, shuffle: !state.shuffle }
+    case "TOGGLE_SHUFFLE": {
+      const shuffle = !state.shuffle
+      if (!state.currentTrackId) return { ...state, shuffle }
+      const { queue, index } = buildQueue(
+        action.playlistTrackIds,
+        state.currentTrackId,
+        shuffle,
+        action.seed
+      )
+      return { ...state, shuffle, queue, queueIndex: index }
+    }
 
     case "CYCLE_REPEAT":
       return { ...state, repeat: nextRepeat[state.repeat] }

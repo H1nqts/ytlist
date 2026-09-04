@@ -38,6 +38,10 @@ function isFresh(cached: CachedStream | undefined): cached is CachedStream {
   return cached.expiresAt - Date.now() / 1000 > EXPIRY_MARGIN_SEC
 }
 
+function shuffleSeed(): number {
+  return (Math.random() * 0x100000000) >>> 0
+}
+
 function cacheStream(
   cache: Map<string, CachedStream>,
   trackId: string,
@@ -153,6 +157,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         durationSec: track.durationSec,
         playlistTrackIds: playlist.tracks.map((t) => t.id),
         shuffle,
+        seed: shuffleSeed(),
       })
     },
     [getPlaylist]
@@ -185,10 +190,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     []
   )
   const toggleMute = React.useCallback(() => dispatch({ type: "TOGGLE_MUTE" }), [])
-  const toggleShuffle = React.useCallback(
-    () => dispatch({ type: "TOGGLE_SHUFFLE" }),
-    []
-  )
+  const toggleShuffle = React.useCallback(() => {
+    const playlist = state.currentPlaylistId
+      ? getPlaylist(state.currentPlaylistId)
+      : undefined
+    dispatch({
+      type: "TOGGLE_SHUFFLE",
+      playlistTrackIds: playlist?.tracks.map((t) => t.id) ?? [],
+      seed: shuffleSeed(),
+    })
+  }, [state.currentPlaylistId, getPlaylist])
   const cycleRepeat = React.useCallback(() => dispatch({ type: "CYCLE_REPEAT" }), [])
   const enqueue = React.useCallback(
     (trackId: string) => dispatch({ type: "ENQUEUE", trackId }),
