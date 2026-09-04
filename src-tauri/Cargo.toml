@@ -30,3 +30,5 @@ idna_adapter = "=1.2.1"
 chrono = "0.4.45"
 url = "2.5.8"
 youtube_dl = { version = "0.10.0", features = ["downloader-rustls-tls"] }
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"

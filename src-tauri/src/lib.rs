@@ -14,6 +14,10 @@ use tauri::Manager;
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
+            #[cfg(desktop)]
+            app.handle()
+                .plugin(tauri_plugin_updater::Builder::new().build())?;
+
             let conn = db::init(app.handle())?;
             let settings = settings::init(app.handle())?;
             let ytdlp = Arc::new(ytdlp::Manager::new(app.handle())?);
@@ -30,6 +34,7 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(commands::COMMAND_HANDLERS)
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
