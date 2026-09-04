@@ -13,7 +13,7 @@ const LICENSES: { license: string; packages: string }[] = [
   {
     license: "MIT",
     packages:
-      "React, Radix UI, Tailwind CSS, sonner, next-themes, clsx, tailwind-merge, rusqlite, SQLite bindings",
+      "React, Radix UI, Tailwind CSS, sonner, clsx, tailwind-merge, rusqlite, SQLite bindings",
   },
   { license: "Apache-2.0", packages: "class-variance-authority" },
   { license: "ISC", packages: "lucide-react" },
