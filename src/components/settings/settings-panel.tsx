@@ -60,7 +60,7 @@ export function SettingsPanel({ open, onOpenChange }: SettingsPanelProps) {
           <TabsContent value="shortcuts" className="max-h-80 overflow-y-auto pt-2">
             <SettingsShortcuts />
           </TabsContent> */}
-          <TabsContent value="about" className="pt-2">
+          <TabsContent value="about" className="max-h-80 overflow-y-auto pt-2">
             <SettingsAbout />
           </TabsContent>
         </Tabs>
