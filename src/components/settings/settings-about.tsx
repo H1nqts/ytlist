@@ -14,9 +14,6 @@ export function SettingsAbout() {
         A desktop client for browsing and playing your YouTube playlists.
         Built with Tauri, React, and Tailwind CSS.
       </p>
-      {/* <p className="text-xs text-muted-foreground">
-        Made with ♪ — UI preview build.
-      </p> */}
     </div>
   )
 }
