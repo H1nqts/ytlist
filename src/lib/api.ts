@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core"
 
-import type { Playlist as UiPlaylist, Track as UiTrack } from "@/types"
+import type { AppSettings, Playlist as UiPlaylist, Track as UiTrack } from "@/types"
 
 export interface Playlist {
   id: number
@@ -80,6 +80,16 @@ export function ytdlpRetry(): Promise<YtdlpStatus> {
 
 export function streamResolve(videoId: string): Promise<StreamInfo> {
   return invoke<StreamInfo>("stream_resolve", { videoId })
+}
+
+export type SettingsPatch = Partial<AppSettings>
+
+export function settingsGet(): Promise<AppSettings> {
+  return invoke<AppSettings>("settings_get")
+}
+
+export function settingsUpdate(patch: SettingsPatch): Promise<AppSettings> {
+  return invoke<AppSettings>("settings_update", { patch })
 }
 
 export function toUiTrack(video: Video): UiTrack {
