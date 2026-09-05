@@ -1,6 +1,7 @@
 import { ListMusicIcon } from "lucide-react"
 
 import { Separator } from "@/components/ui/separator"
+import { SettingsUpdate } from "@/components/settings/settings-update"
 import { getVersion } from '@tauri-apps/api/app'
 import { useEffect, useState } from "react";
 
@@ -61,6 +62,9 @@ export function SettingsAbout() {
         <p className="font-heading text-lg font-semibold">ytlist</p>
         <p className="text-xs text-muted-foreground">Version {version}</p>
       </div>
+
+      <SettingsUpdate />
+
       <p className="max-w-xs text-xs text-muted-foreground">
         A desktop client for browsing and playing your YouTube playlists.
         Built with Tauri, React, and Tailwind CSS.
