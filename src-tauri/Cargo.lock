@@ -4040,7 +4040,7 @@ checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
 [[package]]
 name = "rusty_ytdl"
 version = "0.7.4"
-source = "git+https://github.com/H1nqts/rusty_ytdl?rev=d8e5257#d8e52578bbcc89fa136841674d60d36efe6a6283"
+source = "git+https://github.com/H1nqts/rusty_ytdl?rev=1ddd33a#1ddd33a55ebb23c3ff81f85a145f449766dd64e8"
 dependencies = [
  "aes",
  "async-trait",
