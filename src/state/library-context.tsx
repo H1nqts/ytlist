@@ -15,6 +15,7 @@ import {
   toUiPlaylist,
   toUiTrack,
 } from "@/lib/api"
+import { logError } from "@/lib/logger"
 
 interface LibraryContextValue {
   state: LibraryState
@@ -66,7 +67,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     const frame = requestAnimationFrame(() => {
       reloadPlaylists().catch((err) => {
         if (cancelled) return
-        console.error("Failed to load playlists", err)
+        logError("Failed to load playlists", err)
         dispatch({ type: "INITIAL_LOAD_FAILED" })
         toast.error("Couldn't load your playlists", {
           description: String(err),

@@ -3,6 +3,7 @@ import { toast } from "sonner"
 
 import type { AppSettings, PlayActivation } from "@/types"
 import { settingsGet, settingsUpdate } from "@/lib/api"
+import { logError } from "@/lib/logger"
 
 interface SettingsContextValue extends AppSettings {
   /** False until the persisted settings have been read (or the read failed). */
@@ -35,7 +36,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       })
       .catch((err) => {
         if (cancelled) return
-        console.error("Failed to load settings", err)
+        logError("Failed to load settings", err)
         toast.error("Couldn't load your settings", { description: String(err) })
       })
       .finally(() => {

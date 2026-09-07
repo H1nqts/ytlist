@@ -1,6 +1,7 @@
 import * as React from "react"
 import { toast } from "sonner"
 
+import { logError } from "@/lib/logger"
 import { checkForUpdate } from "@/lib/updater"
 import { AppShell } from "@/components/layout/app-shell"
 import { LibrarySidebar } from "@/components/sidebar/library-sidebar"
@@ -25,7 +26,7 @@ function App() {
           description: "Open Settings › About to install it.",
         })
       })
-      .catch((err) => console.error("Failed to check for updates", err))
+      .catch((err) => logError("Failed to check for updates", err))
 
     return () => {
       cancelled = true

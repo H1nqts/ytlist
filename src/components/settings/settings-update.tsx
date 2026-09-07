@@ -4,6 +4,7 @@ import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
+import { logError } from "@/lib/logger"
 import {
   checkForUpdate,
   installUpdate,
@@ -51,7 +52,7 @@ export function SettingsUpdate() {
       .catch((err) => {
         if (cancelled.current) return
         setStatus("idle")
-        console.error("Failed to check for updates", err)
+        logError("Failed to check for updates", err)
         toast.error("Couldn't check for updates", { description: String(err) })
       })
   }
@@ -71,14 +72,14 @@ export function SettingsUpdate() {
         if (cancelled.current) return
         setStatus("available")
         setProgress(null)
-        console.error("Failed to install the update", err)
+        logError("Failed to install the update", err)
         toast.error("Couldn't install the update", { description: String(err) })
       })
   }
 
   function onRelaunch() {
     relaunch().catch((err) => {
-      console.error("Failed to relaunch", err)
+      logError("Failed to relaunch", err)
       toast.error("Couldn't restart ytlist", { description: String(err) })
     })
   }
