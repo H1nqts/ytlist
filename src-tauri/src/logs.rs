@@ -1,5 +1,9 @@
+pub mod commands;
+
+use anyhow::{Context, Result};
 use log::{Level, LevelFilter};
-use tauri::{Runtime, plugin::TauriPlugin};
+use std::path::PathBuf;
+use tauri::{AppHandle, Manager as _, Runtime, plugin::TauriPlugin};
 use tauri_plugin_log::{
     FileOpenStrategy, RotationStrategy, Target, TargetKind, TimezoneStrategy, WEBVIEW_TARGET,
 };
@@ -31,6 +35,10 @@ pub fn plugin<R: Runtime>() -> TauriPlugin<R> {
         .level(level)
         .filter(is_own_record)
         .build()
+}
+
+pub fn dir(app: &AppHandle) -> Result<PathBuf> {
+    app.path().app_log_dir().context("no app log dir")
 }
 
 fn is_own_record(metadata: &log::Metadata) -> bool {

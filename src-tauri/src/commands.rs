@@ -1,6 +1,7 @@
-use crate::{playlist, settings, ytdlp};
+use crate::{logs, playlist, settings, ytdlp};
 
 pub const COMMAND_HANDLERS: fn(tauri::ipc::Invoke) -> bool = tauri::generate_handler![
+    logs::commands::log_dir_get,
     playlist::commands::playlist_add,
     playlist::commands::playlist_rename,
     playlist::commands::playlist_delete,

@@ -92,6 +92,10 @@ export function settingsUpdate(patch: SettingsPatch): Promise<AppSettings> {
   return invoke<AppSettings>("settings_update", { patch })
 }
 
+export function logDirGet(): Promise<string> {
+  return invoke<string>("log_dir_get")
+}
+
 export function toUiTrack(video: Video): UiTrack {
   return {
     id: video.id,
