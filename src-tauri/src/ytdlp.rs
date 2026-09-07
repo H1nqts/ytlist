@@ -126,6 +126,7 @@ impl Manager {
                 Ok(path)
             }
             Err(e) => {
+                log::error!("yt-dlp is unavailable: {e:#}");
                 self.set_status(Status::error(e.to_string()));
                 Err(e)
             }
@@ -141,6 +142,12 @@ impl Manager {
     }
 
     pub async fn resolve_stream(&self, video_id: &str) -> Result<StreamInfo> {
+        self.resolve_stream_inner(video_id).await.inspect_err(|e| {
+            log::error!("failed to resolve a stream for {video_id}: {e:#}");
+        })
+    }
+
+    async fn resolve_stream_inner(&self, video_id: &str) -> Result<StreamInfo> {
         validate_video_id(video_id)?;
         let bin = self.ensure().await?;
 
@@ -167,13 +174,19 @@ impl Manager {
         self.set_status(Status::new(State::Downloading));
         std::fs::create_dir_all(&self.dir)
             .with_context(|| format!("failed to create bin dir: {}", self.dir.display()))?;
-        download_yt_dlp(&self.dir)
+
+        log::info!("downloading yt-dlp into {}", self.dir.display());
+        let path = download_yt_dlp(&self.dir)
             .await
-            .context("failed to download yt-dlp")
+            .context("failed to download yt-dlp")?;
+        log::info!("downloaded yt-dlp");
+
+        Ok(path)
     }
 
     async fn update(&self, path: &Path) -> Result<PathBuf> {
         self.set_status(Status::new(State::Updating));
+        log::info!("updating yt-dlp");
 
         match self_update(path.to_owned()).await {
             Ok(()) => return Ok(path.to_owned()),

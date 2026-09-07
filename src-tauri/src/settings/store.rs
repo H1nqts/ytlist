@@ -47,7 +47,9 @@ impl Store {
 
         let mut next = settings.clone();
         next.apply(patch);
-        self.save(&next)?;
+        self.save(&next).inspect_err(|e| {
+            log::error!("failed to save {}: {e:#}", self.path.display());
+        })?;
         *settings = next.clone();
 
         Ok(next)
