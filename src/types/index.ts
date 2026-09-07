@@ -14,6 +14,36 @@ export interface Track {
   views: number
 }
 
+export type SkipReason =
+  | "missingContentId"
+  | "emptyContentId"
+  | "missingVideoId"
+  | "unknownRendererType"
+  | "containerNotArray"
+
+export interface SkippedVideo {
+  /** Position within the page the entry came from, so it repeats across pages. */
+  index: number
+  videoId: string | null
+  reason: SkipReason
+  detail: string | null
+}
+
+export type FetchStop =
+  | "notFetched"
+  | "completed"
+  | "noContinuationToken"
+  | "limitReached"
+  | "requestFailed"
+  | "responseShapeChanged"
+  | "emptyPage"
+
+export interface FetchOutcome {
+  stop: FetchStop
+  detail: string | null
+  complete: boolean
+}
+
 export interface Playlist {
   /** Backend row id; negative while the playlist is not persisted yet. */
   id: number
@@ -31,6 +61,8 @@ export interface Playlist {
   errorMessage?: string
   /** ISO timestamp of the last successful fetch/refresh. */
   lastSyncedAt: string
+  skipped: SkippedVideo[]
+  fetchOutcome?: FetchOutcome
 }
 
 export interface PlayerState {

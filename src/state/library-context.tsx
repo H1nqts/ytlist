@@ -94,6 +94,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       thumbnailUrl: "",
       tracks: [],
       tracksLoaded: false,
+      skipped: [],
       status: "loading",
       loadingKind: "fetch",
       lastSyncedAt: new Date(createdAt).toISOString(),
@@ -136,12 +137,14 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       fetchSeq.current.set(playlistId, inFlight)
 
       playlistFetchVideos(playlistId)
-        .then((videos) => {
+        .then((result) => {
           if (fetchSeq.current.get(playlistId) !== inFlight) return
           dispatch({
             type: "FETCH_SUCCESS",
             playlistId,
-            tracks: videos.map(toUiTrack),
+            tracks: result.videos.map(toUiTrack),
+            skipped: result.skipped,
+            outcome: result.outcome,
             syncedAt: new Date().toISOString(),
           })
         })

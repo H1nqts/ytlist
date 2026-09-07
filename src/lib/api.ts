@@ -1,6 +1,12 @@
 import { invoke } from "@tauri-apps/api/core"
 
-import type { AppSettings, Playlist as UiPlaylist, Track as UiTrack } from "@/types"
+import type {
+  AppSettings,
+  FetchOutcome,
+  Playlist as UiPlaylist,
+  SkippedVideo,
+  Track as UiTrack,
+} from "@/types"
 
 export interface Playlist {
   id: number
@@ -27,6 +33,12 @@ export interface Video {
   /** Millisecond */
   duration: number
   views: number
+}
+
+export interface PlaylistVideos {
+  videos: Video[]
+  skipped: SkippedVideo[]
+  outcome: FetchOutcome
 }
 
 export type YtdlpState =
@@ -66,8 +78,8 @@ export function playlistGetAll(): Promise<Playlist[]> {
   return invoke<Playlist[]>("playlist_get_all")
 }
 
-export function playlistFetchVideos(id: number): Promise<Video[]> {
-  return invoke<Video[]>("playlist_fetch_videos", { id })
+export function playlistFetchVideos(id: number): Promise<PlaylistVideos> {
+  return invoke<PlaylistVideos>("playlist_fetch_videos", { id })
 }
 
 export function ytdlpStatus(): Promise<YtdlpStatus> {
@@ -119,5 +131,6 @@ export function toUiPlaylist(row: Playlist): UiPlaylist {
     // Fetched separately via playlist_fetch_videos.
     tracks: [],
     tracksLoaded: false,
+    skipped: [],
   }
 }

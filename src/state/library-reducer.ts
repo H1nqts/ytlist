@@ -1,4 +1,10 @@
-import type { LibraryState, Playlist, Track } from "@/types"
+import type {
+  FetchOutcome,
+  LibraryState,
+  Playlist,
+  SkippedVideo,
+  Track,
+} from "@/types"
 
 export type LibraryAction =
   | { type: "SET_PLAYLISTS"; playlists: Playlist[] }
@@ -11,6 +17,8 @@ export type LibraryAction =
       type: "FETCH_SUCCESS"
       playlistId: number
       tracks: Track[]
+      skipped: SkippedVideo[]
+      outcome: FetchOutcome
       syncedAt: string
       title?: string
     }
@@ -86,6 +94,8 @@ export function libraryReducer(
           status: "loading",
           loadingKind: "fetch",
           errorMessage: undefined,
+          skipped: [],
+          fetchOutcome: undefined,
         })),
       }
 
@@ -97,6 +107,8 @@ export function libraryReducer(
           status: "loading",
           loadingKind: "refresh",
           errorMessage: undefined,
+          skipped: [],
+          fetchOutcome: undefined,
         })),
       }
 
@@ -110,6 +122,8 @@ export function libraryReducer(
           errorMessage: undefined,
           tracks: action.tracks,
           tracksLoaded: true,
+          skipped: action.skipped,
+          fetchOutcome: action.outcome,
           title: action.title ?? p.title,
           lastSyncedAt: action.syncedAt,
         })),
