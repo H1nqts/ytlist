@@ -177,13 +177,13 @@ impl Manager {
 
         match self_update(path.to_owned()).await {
             Ok(()) => return Ok(path.to_owned()),
-            Err(e) => eprintln!("warning: yt-dlp self-update failed: {e}"),
+            Err(e) => log::warn!("yt-dlp self-update failed: {e:#}"),
         }
 
         match self.download().await {
             Ok(path) => Ok(path),
             Err(e) if path.is_file() => {
-                eprintln!("warning: yt-dlp re-download failed, keeping existing binary: {e}");
+                log::warn!("yt-dlp re-download failed, keeping existing binary: {e:#}");
                 Ok(path.to_owned())
             }
             Err(e) => Err(e),

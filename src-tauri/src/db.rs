@@ -19,7 +19,7 @@ fn configure(conn: &Connection) -> Result<()> {
         .query_row("PRAGMA journal_mode = WAL", [], |row| row.get(0))
         .context("failed to set journal_mode=WAL")?;
     if mode.to_lowercase() != "wal" {
-        eprintln!("warning: journal_mode is '{}', not WAL", mode);
+        log::warn!("journal_mode is '{}', not WAL", mode);
     }
 
     conn.pragma_update(None, "foreign_keys", "ON")

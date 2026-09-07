@@ -71,7 +71,7 @@ fn load(path: &Path, backup: &Path) -> Settings {
         Ok(raw) => raw,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Settings::default(),
         Err(e) => {
-            eprintln!("warning: failed to read {}: {e}", path.display());
+            log::warn!("failed to read {}: {e}", path.display());
             return Settings::default();
         }
     };
@@ -79,12 +79,12 @@ fn load(path: &Path, backup: &Path) -> Settings {
     match serde_json::from_str(&raw) {
         Ok(settings) => settings,
         Err(e) => {
-            eprintln!(
-                "warning: {} is not valid settings JSON ({e}); falling back to defaults",
+            log::warn!(
+                "{} is not valid settings JSON ({e}); falling back to defaults",
                 path.display()
             );
             if let Err(e) = std::fs::rename(path, backup) {
-                eprintln!("warning: failed to back up {}: {e}", path.display());
+                log::warn!("failed to back up {}: {e}", path.display());
             }
             Settings::default()
         }

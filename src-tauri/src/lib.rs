@@ -1,5 +1,6 @@
 mod commands;
 mod db;
+mod logs;
 mod playlist;
 mod settings;
 mod state;
@@ -13,7 +14,10 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(logs::plugin())
         .setup(|app| {
+            log::info!("starting ytlist {}", app.package_info().version);
+
             #[cfg(desktop)]
             app.handle()
                 .plugin(tauri_plugin_updater::Builder::new().build())?;
