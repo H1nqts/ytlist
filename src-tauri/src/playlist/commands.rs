@@ -62,11 +62,11 @@ pub fn playlist_rename(state: State<AppState>, id: i64, name: &str) -> Result<Pl
 #[tauri::command]
 pub fn playlist_delete(state: State<AppState>, id: i64) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    super::delete(&conn, id)
+    let name = super::delete(&conn, id)
         .inspect_err(|e| log::error!("failed to delete playlist {id}: {e:#}"))
         .map_err(|e| e.to_string())?;
 
-    log::info!("deleted playlist {id}");
+    log::info!("deleted playlist {id} ({name})");
 
     Ok(())
 }

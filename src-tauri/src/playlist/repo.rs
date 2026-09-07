@@ -65,7 +65,11 @@ pub fn rename(conn: &Connection, id: i64, name: &str) -> Result<Playlist> {
     Ok(res)
 }
 
-pub fn delete(conn: &Connection, id: i64) -> Result<()> {
-    conn.execute("DELETE FROM playlists WHERE id = ?1", [id])?;
-    Ok(())
+pub fn delete(conn: &Connection, id: i64) -> Result<String> {
+    let name = conn.query_row(
+        "DELETE FROM playlists WHERE id = ?1 RETURNING name",
+        [id],
+        |row| row.get(0),
+    )?;
+    Ok(name)
 }

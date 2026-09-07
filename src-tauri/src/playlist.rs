@@ -57,7 +57,7 @@ pub fn rename(conn: &Connection, id: i64, name: &str) -> Result<Playlist> {
     repo::rename(conn, id, name)
 }
 
-pub fn delete(conn: &Connection, id: i64) -> Result<()> {
+pub fn delete(conn: &Connection, id: i64) -> Result<String> {
     repo::delete(conn, id)
 }
 
