@@ -31,7 +31,13 @@ export type PlayerAction =
       shuffle: boolean
       repeat: RepeatMode
     }
-  | { type: "SET_QUEUE"; queue: QueueEntry[] }
+  | {
+      type: "RESTORE_QUEUE"
+      queue: QueueEntry[]
+      currentQueueKey: string | null
+      currentPlaylistId: number | null
+      durationSec: number
+    }
   | { type: "ENQUEUE"; trackId: string }
   | { type: "REMOVE_FROM_QUEUE"; key: string }
   | { type: "JUMP_IN_QUEUE"; key: string; durationSec: number }
@@ -50,7 +56,6 @@ export const initialPlayerState: PlayerState = {
   queueIndex: -1,
 }
 
-/** Keys only have to be unique within one queue, so the position works. */
 export function queueKeyFor(trackIndex: number, trackId: string): string {
   return `${trackIndex}:${trackId}`
 }
@@ -217,12 +222,22 @@ export function playerReducer(
         repeat: action.repeat,
       }
 
-    case "SET_QUEUE":
+    case "RESTORE_QUEUE": {
+      const queueIndex = action.queue.findIndex(
+        (e) => e.key === action.currentQueueKey
+      )
+      const current = queueIndex === -1 ? null : action.queue[queueIndex]
       return {
         ...state,
+        isPlaying: false,
         queue: action.queue,
-        queueIndex: Math.min(state.queueIndex, action.queue.length - 1),
+        queueIndex,
+        currentTrackId: current?.trackId ?? null,
+        currentQueueKey: current?.key ?? null,
+        currentPlaylistId: action.currentPlaylistId,
+        durationSec: current ? action.durationSec : 0,
       }
+    }
 
     case "ENQUEUE": {
       const key = `add:${state.queue.length}:${action.trackId}`

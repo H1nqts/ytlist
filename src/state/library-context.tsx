@@ -33,6 +33,11 @@ interface LibraryContextValue {
   setSearch: (search: string) => void
   getPlaylist: (playlistId: number) => Playlist | undefined
   getTrack: (trackId: string) => Track | undefined
+  /**
+   * Make tracks resolvable by `getTrack` without loading their playlist, which
+   * a restored queue needs before its playlist is selected, or after it is gone.
+   */
+  addLooseTracks: (tracks: Track[]) => void
 }
 
 const LibraryContext = React.createContext<LibraryContextValue | null>(null)
@@ -55,6 +60,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
   const nextTempId = React.useRef(-1)
   // Playlists added this session, which have no stored videos to read yet.
   const justAdded = React.useRef(new Set<number>())
+  const [looseTracks, setLooseTracks] = React.useState(new Map<string, Track>())
 
   // Reload the full playlist set from the backend (source of truth).
   const reloadPlaylists = React.useCallback(async () => {
@@ -277,9 +283,17 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
   }, [state.playlists])
 
   const getTrack = React.useCallback(
-    (trackId: string) => trackIndex.get(trackId),
-    [trackIndex]
+    (trackId: string) => trackIndex.get(trackId) ?? looseTracks.get(trackId),
+    [trackIndex, looseTracks]
   )
+
+  const addLooseTracks = React.useCallback((tracks: Track[]) => {
+    setLooseTracks((current) => {
+      const next = new Map(current)
+      for (const track of tracks) next.set(track.id, track)
+      return next
+    })
+  }, [])
 
   const value = React.useMemo<LibraryContextValue>(
     () => ({
@@ -296,6 +310,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       setSearch,
       getPlaylist,
       getTrack,
+      addLooseTracks,
     }),
     [
       state,
@@ -310,6 +325,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       setSearch,
       getPlaylist,
       getTrack,
+      addLooseTracks,
     ]
   )
 

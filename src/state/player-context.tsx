@@ -1,5 +1,6 @@
 import * as React from "react"
 import { listen } from "@tauri-apps/api/event"
+import { getCurrentWindow } from "@tauri-apps/api/window"
 import { toast } from "sonner"
 
 import type { PlayerState, Track } from "@/types"
@@ -11,13 +12,20 @@ import {
 import { LibraryContext } from "@/state/library-context"
 import { SettingsContext } from "@/state/settings-context"
 import {
+  playbackGet,
+  playbackSet,
   streamResolve,
+  toUiTrack,
+  videoGetByIds,
   ytdlpRetry,
   ytdlpStatus as fetchYtdlpStatus,
   type YtdlpStatus,
 } from "@/lib/api"
+import { logError } from "@/lib/logger"
 
 const YTDLP_STATUS_EVENT = "ytdlp://status"
+
+const FLUSH_EVENT = "app://flush"
 
 /** Re-resolve a stream this long before its URL expires. */
 const EXPIRY_MARGIN_SEC = 60
@@ -31,6 +39,12 @@ const STREAM_CACHE_MAX = 64
 
 /** The volume slider fires per pixel of a drag, so collapse a drag into one save. */
 const SETTINGS_SAVE_DELAY_MS = 500
+
+/** The queue only changes when playback starts or it is edited by hand. */
+const QUEUE_SAVE_DELAY_MS = 30_000
+
+/** A track change is worth keeping sooner, but not on every skip. */
+const POSITION_SAVE_DELAY_MS = 5_000
 
 interface CachedStream {
   url: string
@@ -103,7 +117,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   if (!library) {
     throw new Error("PlayerProvider must be rendered inside a LibraryProvider")
   }
-  const { getTrack, getPlaylist } = library
+  const { getTrack, getPlaylist, addLooseTracks } = library
 
   const settings = React.useContext(SettingsContext)
   if (!settings) {
@@ -374,13 +388,104 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     saveTimer.current = window.setTimeout(flushSettings, SETTINGS_SAVE_DELAY_MS)
   }, [state.volume, state.muted, state.shuffle, state.repeat, flushSettings])
 
+  const queueRestored = React.useRef(false)
+
   React.useEffect(() => {
-    window.addEventListener("pagehide", flushSettings)
+    // The load effect resolves a stream as soon as a track is restored, which
+    // fails loudly if yt-dlp is not ready yet.
+    if (queueRestored.current || ytdlp.state !== "ready") return
+    queueRestored.current = true
+
+    let cancelled = false
+    playbackGet()
+      .then(async (saved) => {
+        if (cancelled || saved.queue.length === 0) return
+
+        const ids = [...new Set(saved.queue.map((e) => e.trackId))]
+        const videos = await videoGetByIds(ids)
+        if (cancelled) return
+
+        const tracks = videos.map(toUiTrack)
+        addLooseTracks(tracks)
+
+        const known = new Set(tracks.map((t) => t.id))
+        const queue = saved.queue.filter((e) => known.has(e.trackId))
+        const current = queue.find((e) => e.key === saved.currentQueueKey)
+
+        dispatch({
+          type: "RESTORE_QUEUE",
+          queue,
+          currentQueueKey: current?.key ?? null,
+          currentPlaylistId: saved.currentPlaylistId,
+          durationSec:
+            tracks.find((t) => t.id === current?.trackId)?.durationSec ?? 0,
+        })
+      })
+      .catch((err) => logError("Failed to restore the queue", err))
+
     return () => {
-      window.removeEventListener("pagehide", flushSettings)
-      flushSettings()
+      cancelled = true
     }
-  }, [flushSettings])
+  }, [ytdlp.state, addLooseTracks])
+
+  const queueTimer = React.useRef<number | null>(null)
+  const positionTimer = React.useRef<number | null>(null)
+
+  const flushPlayback = React.useCallback(() => {
+    if (queueTimer.current !== null) {
+      clearTimeout(queueTimer.current)
+      queueTimer.current = null
+    }
+    if (positionTimer.current !== null) {
+      clearTimeout(positionTimer.current)
+      positionTimer.current = null
+    }
+    if (!queueRestored.current) return Promise.resolve()
+
+    const { queue, currentTrackId, currentQueueKey, currentPlaylistId } =
+      stateRef.current
+    return playbackSet({
+      queue,
+      currentTrackId,
+      currentQueueKey,
+      currentPlaylistId,
+    }).catch((err) => logError("Failed to save the queue", err))
+  }, [])
+
+  React.useEffect(() => {
+    if (!queueRestored.current) return
+    if (queueTimer.current !== null) clearTimeout(queueTimer.current)
+    queueTimer.current = window.setTimeout(flushPlayback, QUEUE_SAVE_DELAY_MS)
+  }, [state.queue, flushPlayback])
+
+  React.useEffect(() => {
+    if (!queueRestored.current) return
+    if (positionTimer.current !== null) clearTimeout(positionTimer.current)
+    positionTimer.current = window.setTimeout(
+      flushPlayback,
+      POSITION_SAVE_DELAY_MS
+    )
+  }, [state.currentQueueKey, state.currentPlaylistId, flushPlayback])
+
+  const flushAll = React.useCallback(() => {
+    flushSettings()
+    return flushPlayback()
+  }, [flushSettings, flushPlayback])
+
+  React.useEffect(() => {
+    const unlisten = listen(FLUSH_EVENT, () => {
+      void flushAll().finally(() => {
+        getCurrentWindow().close().catch(() => {})
+      })
+    })
+
+    window.addEventListener("pagehide", flushAll)
+    return () => {
+      unlisten.then((off) => off()).catch(() => {})
+      window.removeEventListener("pagehide", flushAll)
+      flushAll()
+    }
+  }, [flushAll])
 
   const trackId = state.currentTrackId
 
