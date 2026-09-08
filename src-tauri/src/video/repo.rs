@@ -1,7 +1,17 @@
 use anyhow::Result;
-use rusqlite::{params, Connection};
+use rusqlite::{params, params_from_iter, Connection, Row};
 
-use super::{Channel, PlaylistVideos};
+use super::{Channel, FetchOutcome, PlaylistVideos, SkippedVideo, Video};
+
+/// SQLite's default cap on host parameters per statement.
+const MAX_PARAMS: usize = 999;
+
+const SELECT_VIDEO: &str = "
+    SELECT v.id, v.title, v.thumbnail, v.duration, v.views,
+           v.channel_id, c.name AS channel_name, c.icon AS channel_icon
+    FROM videos v
+    LEFT JOIN channels c ON c.id = v.channel_id
+";
 
 fn strip_query(url: &str) -> &str {
     url.split_once('?').map_or(url, |(base, _)| base)
@@ -9,6 +19,30 @@ fn strip_query(url: &str) -> &str {
 
 fn channel_key(channel: &Channel) -> Option<&str> {
     (!channel.id.is_empty()).then_some(channel.id.as_str())
+}
+
+fn row_to_video(row: &Row) -> rusqlite::Result<Video> {
+    Ok(Video {
+        id: row.get("id")?,
+        title: row.get("title")?,
+        thumbnail: row.get("thumbnail")?,
+        channel: Channel {
+            id: row.get::<_, Option<String>>("channel_id")?.unwrap_or_default(),
+            name: row.get::<_, Option<String>>("channel_name")?.unwrap_or_default(),
+            icon: row.get::<_, Option<String>>("channel_icon")?.unwrap_or_default(),
+        },
+        duration: row.get::<_, i64>("duration")? as u64,
+        views: row.get::<_, i64>("views")? as u64,
+    })
+}
+
+fn row_to_skipped(row: &Row) -> rusqlite::Result<SkippedVideo> {
+    Ok(SkippedVideo {
+        index: row.get::<_, i64>("entry_index")? as usize,
+        video_id: row.get("video_id")?,
+        reason: row.get("reason")?,
+        detail: row.get("detail")?,
+    })
 }
 
 pub fn save_fetched(
@@ -82,4 +116,47 @@ pub fn save_fetched(
     tx.commit()?;
 
     Ok(())
+}
+
+pub fn get_for_playlist(conn: &Connection, playlist_id: i64) -> Result<PlaylistVideos> {
+    let mut stmt = conn.prepare(&format!(
+        "{SELECT_VIDEO}
+         JOIN playlist_videos pv ON pv.video_id = v.id
+         WHERE pv.playlist_id = ?1
+         ORDER BY pv.position"
+    ))?;
+    let videos = stmt
+        .query_map([playlist_id], row_to_video)?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+
+    let mut stmt = conn.prepare(
+        "SELECT entry_index, video_id, reason, detail
+         FROM playlist_skipped
+         WHERE playlist_id = ?1
+         ORDER BY rowid",
+    )?;
+    let skipped = stmt
+        .query_map([playlist_id], row_to_skipped)?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+
+    Ok(PlaylistVideos {
+        videos,
+        skipped,
+        outcome: FetchOutcome::stored(),
+    })
+}
+
+pub fn get_by_ids(conn: &Connection, ids: &[String]) -> Result<Vec<Video>> {
+    let mut found = Vec::with_capacity(ids.len());
+
+    for chunk in ids.chunks(MAX_PARAMS) {
+        let placeholders = vec!["?"; chunk.len()].join(",");
+        let mut stmt = conn.prepare(&format!("{SELECT_VIDEO} WHERE v.id IN ({placeholders})"))?;
+
+        for video in stmt.query_map(params_from_iter(chunk), row_to_video)? {
+            found.push(video?);
+        }
+    }
+
+    Ok(found)
 }

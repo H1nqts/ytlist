@@ -101,3 +101,11 @@ pub async fn playlist_fetch_videos(
 
     Ok(fetched)
 }
+
+#[tauri::command]
+pub fn playlist_get_videos(state: State<AppState>, id: i64) -> Result<PlaylistVideos, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    video_repo::get_for_playlist(&conn, id)
+        .inspect_err(|e| log::error!("failed to read videos for playlist {id}: {e:#}"))
+        .map_err(|e| e.to_string())
+}

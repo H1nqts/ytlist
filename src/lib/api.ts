@@ -82,6 +82,14 @@ export function playlistFetchVideos(id: number): Promise<PlaylistVideos> {
   return invoke<PlaylistVideos>("playlist_fetch_videos", { id })
 }
 
+export function playlistGetVideos(id: number): Promise<PlaylistVideos> {
+  return invoke<PlaylistVideos>("playlist_get_videos", { id })
+}
+
+export function videoGetByIds(ids: string[]): Promise<Video[]> {
+  return invoke<Video[]>("video_get_by_ids", { ids })
+}
+
 export function ytdlpStatus(): Promise<YtdlpStatus> {
   return invoke<YtdlpStatus>("ytdlp_status")
 }

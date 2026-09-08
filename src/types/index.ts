@@ -33,6 +33,7 @@ export interface SkippedVideo {
 export type FetchStop =
   | "notFetched"
   | "completed"
+  | "stored"
   | "noContinuationToken"
   | "limitReached"
   | "requestFailed"

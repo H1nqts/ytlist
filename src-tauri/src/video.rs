@@ -1,3 +1,4 @@
+pub mod commands;
 pub mod repo;
 
 use anyhow::Result;
@@ -79,6 +80,11 @@ impl FetchOutcome {
             Some(FetchStop::ResponseShapeChanged) => Self::truncated("responseShapeChanged", None),
             Some(FetchStop::EmptyPage) => Self::truncated("emptyPage", None),
         }
+    }
+
+    /// A truncated fetch is never saved, so anything read back was complete.
+    pub fn stored() -> Self {
+        Self::complete("stored")
     }
 
     fn complete(stop: &'static str) -> Self {
