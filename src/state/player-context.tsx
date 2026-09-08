@@ -9,6 +9,7 @@ import {
   RESTART_THRESHOLD_SEC,
 } from "@/state/player-reducer"
 import { LibraryContext } from "@/state/library-context"
+import { SettingsContext } from "@/state/settings-context"
 import {
   streamResolve,
   ytdlpRetry,
@@ -27,6 +28,9 @@ const FALLBACK_TTL_SEC = 3600
 const PRELOAD_COUNT = 2
 
 const STREAM_CACHE_MAX = 64
+
+/** The volume slider fires per pixel of a drag, so collapse a drag into one save. */
+const SETTINGS_SAVE_DELAY_MS = 500
 
 interface CachedStream {
   url: string
@@ -101,7 +105,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }
   const { getTrack, getPlaylist } = library
 
+  const settings = React.useContext(SettingsContext)
+  if (!settings) {
+    throw new Error("PlayerProvider must be rendered inside a SettingsProvider")
+  }
+
   const [state, dispatch] = React.useReducer(playerReducer, initialPlayerState)
+  const stateRef = React.useRef(state)
+  stateRef.current = state
   const [progressSec, setProgressSec] = React.useState(0)
   const [streamLoading, setStreamLoading] = React.useState(false)
   const [streamError, setStreamError] = React.useState<string | null>(null)
@@ -332,6 +343,44 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     audio.volume = state.volume
     audio.muted = state.muted
   }, [state.volume, state.muted])
+
+  const { loaded: settingsLoaded, updateSettings } = settings
+  const settingsRef = React.useRef(settings)
+  settingsRef.current = settings
+  const restored = React.useRef(false)
+
+  React.useEffect(() => {
+    if (!settingsLoaded || restored.current) return
+    restored.current = true
+    const { volume, muted, shuffle, repeat } = settingsRef.current
+    dispatch({ type: "RESTORE_SETTINGS", volume, muted, shuffle, repeat })
+  }, [settingsLoaded])
+
+  const saveTimer = React.useRef<number | null>(null)
+
+  const flushSettings = React.useCallback(() => {
+    if (saveTimer.current === null) return
+    clearTimeout(saveTimer.current)
+    saveTimer.current = null
+    const { volume, muted, shuffle, repeat } = stateRef.current
+    updateSettings({ volume, muted, shuffle, repeat })
+  }, [updateSettings])
+
+  React.useEffect(() => {
+    // Saving before the restore lands would overwrite it with the defaults.
+    if (!restored.current) return
+
+    if (saveTimer.current !== null) clearTimeout(saveTimer.current)
+    saveTimer.current = window.setTimeout(flushSettings, SETTINGS_SAVE_DELAY_MS)
+  }, [state.volume, state.muted, state.shuffle, state.repeat, flushSettings])
+
+  React.useEffect(() => {
+    window.addEventListener("pagehide", flushSettings)
+    return () => {
+      window.removeEventListener("pagehide", flushSettings)
+      flushSettings()
+    }
+  }, [flushSettings])
 
   const trackId = state.currentTrackId
 

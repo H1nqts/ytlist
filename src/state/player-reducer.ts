@@ -24,6 +24,13 @@ export type PlayerAction =
   | { type: "TOGGLE_SHUFFLE"; playlistTrackIds: string[]; seed: number }
   | { type: "CYCLE_REPEAT" }
   | { type: "PAUSE" }
+  | {
+      type: "RESTORE_SETTINGS"
+      volume: number
+      muted: boolean
+      shuffle: boolean
+      repeat: RepeatMode
+    }
   | { type: "SET_QUEUE"; queue: QueueEntry[] }
   | { type: "ENQUEUE"; trackId: string }
   | { type: "REMOVE_FROM_QUEUE"; key: string }
@@ -200,6 +207,15 @@ export function playerReducer(
 
     case "PAUSE":
       return { ...state, isPlaying: false }
+
+    case "RESTORE_SETTINGS":
+      return {
+        ...state,
+        volume: Math.min(1, Math.max(0, action.volume)),
+        muted: action.muted,
+        shuffle: action.shuffle,
+        repeat: action.repeat,
+      }
 
     case "SET_QUEUE":
       return {

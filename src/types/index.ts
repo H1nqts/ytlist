@@ -102,4 +102,9 @@ export interface LibraryState {
 
 export interface AppSettings {
   playActivation: PlayActivation
+  /** 0..1 */
+  volume: number
+  muted: boolean
+  shuffle: boolean
+  repeat: RepeatMode
 }

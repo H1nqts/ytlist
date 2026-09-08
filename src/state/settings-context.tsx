@@ -14,6 +14,10 @@ interface SettingsContextValue extends AppSettings {
 
 const defaultSettings: AppSettings = {
   playActivation: "double",
+  volume: 0.8,
+  muted: false,
+  shuffle: false,
+  repeat: "off",
 }
 
 const SettingsContext = React.createContext<SettingsContextValue | null>(null)
