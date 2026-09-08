@@ -1,4 +1,4 @@
-use crate::{logs, playlist, settings, video, ytdlp};
+use crate::{logs, playback, playlist, settings, video, ytdlp};
 
 pub const COMMAND_HANDLERS: fn(tauri::ipc::Invoke) -> bool = tauri::generate_handler![
     logs::commands::log_dir_get,
@@ -11,6 +11,8 @@ pub const COMMAND_HANDLERS: fn(tauri::ipc::Invoke) -> bool = tauri::generate_han
     video::commands::video_get_by_ids,
     settings::commands::settings_get,
     settings::commands::settings_update,
+    playback::commands::playback_get,
+    playback::commands::playback_set,
     ytdlp::commands::ytdlp_status,
     ytdlp::commands::ytdlp_retry,
     ytdlp::commands::stream_resolve,

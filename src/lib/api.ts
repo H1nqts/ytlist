@@ -4,6 +4,7 @@ import type {
   AppSettings,
   FetchOutcome,
   Playlist as UiPlaylist,
+  QueueEntry,
   SkippedVideo,
   Track as UiTrack,
 } from "@/types"
@@ -110,6 +111,21 @@ export function settingsGet(): Promise<AppSettings> {
 
 export function settingsUpdate(patch: SettingsPatch): Promise<AppSettings> {
   return invoke<AppSettings>("settings_update", { patch })
+}
+
+export interface Playback {
+  queue: QueueEntry[]
+  currentTrackId: string | null
+  currentQueueKey: string | null
+  currentPlaylistId: number | null
+}
+
+export function playbackGet(): Promise<Playback> {
+  return invoke<Playback>("playback_get")
+}
+
+export function playbackSet(playback: Playback): Promise<void> {
+  return invoke<void>("playback_set", { playback })
 }
 
 export function logDirGet(): Promise<string> {

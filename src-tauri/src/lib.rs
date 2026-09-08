@@ -1,6 +1,7 @@
 mod commands;
 mod db;
 mod logs;
+mod playback;
 mod playlist;
 mod settings;
 mod state;
@@ -24,11 +25,13 @@ pub fn run() {
 
             let conn = db::init(app.handle())?;
             let settings = settings::init(app.handle())?;
+            let playback = playback::init(app.handle())?;
             let ytdlp = Arc::new(ytdlp::Manager::new(app.handle())?);
             app.manage(AppState {
                 db: Mutex::new(conn),
                 ytdlp: ytdlp.clone(),
                 settings,
+                playback,
             });
 
             tauri::async_runtime::spawn(async move {
