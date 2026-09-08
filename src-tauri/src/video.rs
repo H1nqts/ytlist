@@ -50,6 +50,7 @@ impl SkippedVideo {
             SkipReason::MissingContentId => ("missingContentId", None),
             SkipReason::EmptyContentId => ("emptyContentId", None),
             SkipReason::MissingVideoId => ("missingVideoId", None),
+            SkipReason::Unplayable => ("unplayable", None),
             SkipReason::UnknownRendererType(keys) => ("unknownRendererType", Some(keys.clone())),
             SkipReason::ContainerNotArray => ("containerNotArray", None),
         };
@@ -97,7 +98,9 @@ impl FetchOutcome {
 
 pub async fn fetch_for_playlist(list_id: String) -> Result<PlaylistVideos> {
     let opts = PlaylistSearchOptions {
+        limit: u64::MAX,
         fetch_all: true,
+        include_unavailable: true,
         ..Default::default()
     };
     let mut playlist = search::Playlist::get(list_id, Some(&opts)).await?;

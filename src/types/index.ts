@@ -18,6 +18,7 @@ export type SkipReason =
   | "missingContentId"
   | "emptyContentId"
   | "missingVideoId"
+  | "unplayable"
   | "unknownRendererType"
   | "containerNotArray"
 
