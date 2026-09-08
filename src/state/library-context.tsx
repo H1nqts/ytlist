@@ -11,6 +11,7 @@ import {
   playlistDelete,
   playlistFetchVideos,
   playlistGetAll,
+  playlistGetVideos,
   playlistRename,
   toUiPlaylist,
   toUiTrack,
@@ -52,6 +53,8 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
   const fetchSeq = React.useRef(new Map<number, number>())
   // Ids for playlists that aren't persisted yet; real row ids are positive.
   const nextTempId = React.useRef(-1)
+  // Playlists added this session, which have no stored videos to read yet.
+  const justAdded = React.useRef(new Set<number>())
 
   // Reload the full playlist set from the backend (source of truth).
   const reloadPlaylists = React.useCallback(async () => {
@@ -108,6 +111,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
           placeholderId: tempId,
           playlist: toUiPlaylist(row),
         })
+        justAdded.current.add(row.id)
       })
       .catch((err) => {
         dispatch({
@@ -119,7 +123,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       })
   }, [])
 
-  // `kind` only selects which loading text the UI shows.
+  // "fetch" re-scrapes YouTube; "refresh" reads what the last scrape stored.
   const loadTracks = React.useCallback(
     (playlistId: number, kind: "fetch" | "refresh") => {
       const playlist = state.playlists.find((p) => p.id === playlistId)
@@ -136,7 +140,10 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       const inFlight = (fetchSeq.current.get(playlistId) ?? 0) + 1
       fetchSeq.current.set(playlistId, inFlight)
 
-      playlistFetchVideos(playlistId)
+      const load =
+        kind === "fetch" ? playlistFetchVideos : playlistGetVideos
+
+      load(playlistId)
         .then((result) => {
           if (fetchSeq.current.get(playlistId) !== inFlight) return
           dispatch({
@@ -170,14 +177,19 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     [loadTracks]
   )
 
-  // Playlists come from the DB without videos, so fetch on first selection.
+  // Playlists come from the DB without videos, so load them on first selection.
   React.useEffect(() => {
     const id = state.selectedPlaylistId
     if (!id) return
     const playlist = state.playlists.find((p) => p.id === id)
     if (!playlist || playlist.tracksLoaded) return
     if (playlist.status === "loading" || playlist.status === "error") return
-    loadTracks(id, "fetch")
+
+    if (justAdded.current.delete(id)) {
+      loadTracks(id, "fetch")
+      return
+    }
+    loadTracks(id, "refresh")
   }, [state.selectedPlaylistId, state.playlists, loadTracks])
 
   const deletePlaylist = React.useCallback(
