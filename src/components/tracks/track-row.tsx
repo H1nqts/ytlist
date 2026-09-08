@@ -15,10 +15,13 @@ import {
 } from "@/components/ui/tooltip"
 import { usePlayer } from "@/hooks/use-player"
 import { useSettings } from "@/hooks/use-settings"
+import { queueKeyFor } from "@/state/player-reducer"
 
 interface TrackRowProps {
   track: Track
   index: number
+  /** Position in the unfiltered playlist, which the queue is built from. */
+  trackIndex: number
   playlistId: number
 }
 
@@ -30,11 +33,18 @@ function initials(name: string): string {
     .join("")
 }
 
-export function TrackRow({ track, index, playlistId }: TrackRowProps) {
-  const { state, currentTrack, ytdlp, playTrack, enqueue } = usePlayer()
+export function TrackRow({
+  track,
+  index,
+  trackIndex,
+  playlistId,
+}: TrackRowProps) {
+  const { state, ytdlp, playTrack, enqueue } = usePlayer()
   const { playActivation } = useSettings()
 
-  const isCurrent = currentTrack?.id === track.id
+  const isCurrent =
+    state.currentPlaylistId === playlistId &&
+    state.currentQueueKey === queueKeyFor(trackIndex, track.id)
   const isPlayingThis = isCurrent && state.isPlaying
   const canPlay = ytdlp.state === "ready"
 
@@ -47,7 +57,7 @@ export function TrackRow({ track, index, playlistId }: TrackRowProps) {
       )
       return
     }
-    playTrack(track.id, playlistId)
+    playTrack(trackIndex, playlistId)
   }
 
   return (

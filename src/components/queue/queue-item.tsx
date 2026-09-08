@@ -10,17 +10,23 @@ import { usePlayer } from "@/hooks/use-player"
 import { useSettings } from "@/hooks/use-settings"
 
 interface QueueItemProps {
+  /** Identifies this queue slot, not the video, which may repeat. */
+  entryKey: string
   track: Track
   /** When true, this is the currently-playing track (pinned, not removable). */
   current?: boolean
 }
 
-export function QueueItem({ track, current = false }: QueueItemProps) {
+export function QueueItem({
+  entryKey,
+  track,
+  current = false,
+}: QueueItemProps) {
   const { state, jumpInQueue, removeFromQueue } = usePlayer()
   const { playActivation } = useSettings()
 
   function jump() {
-    jumpInQueue(track.id)
+    jumpInQueue(entryKey, track.id)
   }
 
   return (
@@ -90,7 +96,7 @@ export function QueueItem({ track, current = false }: QueueItemProps) {
               aria-label="Remove from queue"
               onClick={(e) => {
                 e.stopPropagation()
-                removeFromQueue(track.id)
+                removeFromQueue(entryKey)
               }}
             >
               <XIcon />

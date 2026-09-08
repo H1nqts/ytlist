@@ -32,14 +32,13 @@ export function TrackToolbar({ playlist }: TrackToolbarProps) {
 
   function handlePlayAll() {
     if (!playable) return
-    playTrack(playlist.tracks[0].id, playlist.id)
+    playTrack(0, playlist.id)
   }
 
   function handleShuffleAll() {
     if (!playable) return
-    const start =
-      playlist.tracks[Math.floor(Math.random() * playlist.tracks.length)]
-    playTrack(start.id, playlist.id, true)
+    const start = Math.floor(Math.random() * playlist.tracks.length)
+    playTrack(start, playlist.id, true)
   }
 
   return (

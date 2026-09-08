@@ -96,6 +96,7 @@ export function TrackList({ playlist }: TrackListProps) {
     <TrackRows
       key={`${playlist.id}:${state.search}`}
       tracks={visibleTracks}
+      allTracks={playlist.tracks}
       playlistId={playlist.id}
     />
   )
@@ -103,10 +104,12 @@ export function TrackList({ playlist }: TrackListProps) {
 
 interface TrackRowsProps {
   tracks: Track[]
+  /** Unfiltered, so a row can report where it sits in the playlist itself. */
+  allTracks: Track[]
   playlistId: number
 }
 
-function TrackRows({ tracks, playlistId }: TrackRowsProps) {
+function TrackRows({ tracks, allTracks, playlistId }: TrackRowsProps) {
   const viewportRef = React.useRef<HTMLDivElement>(null)
   const { start, end, offsetTop } = useRowWindow(
     viewportRef,
@@ -122,9 +125,10 @@ function TrackRows({ tracks, playlistId }: TrackRowsProps) {
         <div className="flex flex-col gap-0.5">
           {tracks.slice(start, end).map((track, i) => (
             <TrackRow
-              key={track.id}
+              key={`${start + i}:${track.id}`}
               track={track}
               index={start + i}
+              trackIndex={allTracks.indexOf(track)}
               playlistId={playlistId}
             />
           ))}

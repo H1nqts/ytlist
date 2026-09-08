@@ -72,7 +72,7 @@ interface PlayerContextValue {
   ytdlp: YtdlpStatus
   retryYtdlp: () => void
   /** Start playing a track from within a playlist (builds the queue). */
-  playTrack: (trackId: string, playlistId: number, shuffle?: boolean) => void
+  playTrack: (trackIndex: number, playlistId: number, shuffle?: boolean) => void
   togglePlay: () => void
   next: () => void
   prev: () => void
@@ -82,8 +82,8 @@ interface PlayerContextValue {
   toggleShuffle: () => void
   cycleRepeat: () => void
   enqueue: (trackId: string) => void
-  removeFromQueue: (trackId: string) => void
-  jumpInQueue: (trackId: string) => void
+  removeFromQueue: (key: string) => void
+  jumpInQueue: (key: string, trackId: string) => void
 }
 
 interface PlayerProgressValue {
@@ -146,16 +146,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const playTrack = React.useCallback(
-    (trackId: string, playlistId: number, shuffle?: boolean) => {
+    (trackIndex: number, playlistId: number, shuffle?: boolean) => {
       const playlist = getPlaylist(playlistId)
-      const track = playlist?.tracks.find((t) => t.id === trackId)
+      const track = playlist?.tracks[trackIndex]
       if (!playlist || !track) return
       dispatch({
         type: "PLAY_TRACK",
-        trackId,
         playlistId,
         durationSec: track.durationSec,
         playlistTrackIds: playlist.tracks.map((t) => t.id),
+        trackIndex,
         shuffle,
         seed: shuffleSeed(),
       })
@@ -206,14 +206,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     []
   )
   const removeFromQueue = React.useCallback(
-    (trackId: string) => dispatch({ type: "REMOVE_FROM_QUEUE", trackId }),
+    (key: string) => dispatch({ type: "REMOVE_FROM_QUEUE", key }),
     []
   )
   const jumpInQueue = React.useCallback(
-    (trackId: string) => {
+    (key: string, trackId: string) => {
       const track = getTrack(trackId)
       if (!track) return
-      dispatch({ type: "JUMP_IN_QUEUE", trackId, durationSec: track.durationSec })
+      dispatch({ type: "JUMP_IN_QUEUE", key, durationSec: track.durationSec })
     },
     [getTrack]
   )
@@ -391,12 +391,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     )
 
     void (async () => {
-      for (const id of upcoming) {
+      for (const { trackId } of upcoming) {
         if (cancelled) return
-        if (isFresh(streamCache.current.get(id))) continue
+        if (isFresh(streamCache.current.get(trackId))) continue
         // Preload failures stay silent: the load effect retries and surfaces
         // the error if the track is actually played.
-        await resolveStream(id, false).catch(() => {})
+        await resolveStream(trackId, false).catch(() => {})
       }
     })()
 

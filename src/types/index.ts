@@ -67,9 +67,17 @@ export interface Playlist {
   fetchOutcome?: FetchOutcome
 }
 
+export interface QueueEntry {
+  /** Unique within the queue, so one video can sit in it more than once. */
+  key: string
+  trackId: string
+}
+
 export interface PlayerState {
   isPlaying: boolean
   currentTrackId: string | null
+  /** Which queue entry is playing; distinguishes repeats of one video. */
+  currentQueueKey: string | null
   currentPlaylistId: number | null
   /** Duration of the current track, cached for the seek bar. */
   durationSec: number
@@ -79,7 +87,7 @@ export interface PlayerState {
   shuffle: boolean
   repeat: RepeatMode
   /** Full playback order (editable from the queue panel). */
-  queue: string[]
+  queue: QueueEntry[]
   /** -1 when nothing is playing. */
   queueIndex: number
 }

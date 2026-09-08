@@ -24,8 +24,11 @@ export function QueuePanel({ open, onOpenChange }: QueuePanelProps) {
     () =>
       state.queue
         .slice(state.queueIndex + 1)
-        .map((id) => getTrack(id))
-        .filter((t): t is NonNullable<typeof t> => Boolean(t)),
+        .map((entry) => {
+          const track = getTrack(entry.trackId)
+          return track ? { key: entry.key, track } : null
+        })
+        .filter((e): e is NonNullable<typeof e> => Boolean(e)),
     [state.queue, state.queueIndex, getTrack]
   )
 
@@ -71,7 +74,11 @@ export function QueuePanel({ open, onOpenChange }: QueuePanelProps) {
                     <p className="mb-1 px-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
                       Now playing
                     </p>
-                    <QueueItem track={currentTrack} current />
+                    <QueueItem
+                      entryKey={state.currentQueueKey ?? ""}
+                      track={currentTrack}
+                      current
+                    />
                   </div>
                 )}
 
@@ -81,8 +88,8 @@ export function QueuePanel({ open, onOpenChange }: QueuePanelProps) {
                       Next up · {queueTracks.length}
                     </p>
                     <div className="flex flex-col gap-0.5">
-                      {queueTracks.map((track) => (
-                        <QueueItem key={track.id} track={track} />
+                      {queueTracks.map(({ key, track }) => (
+                        <QueueItem key={key} entryKey={key} track={track} />
                       ))}
                     </div>
                   </div>
