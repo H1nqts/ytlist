@@ -9,7 +9,7 @@ pub fn init(app: &AppHandle) -> Result<Connection> {
 
     let conn = Connection::open(dir.join("data.db")).context("failed to open data.db")?;
     configure(&conn)?;
-    create_tables(&conn).context("failed to create tables")?;
+    migrate(&conn).context("failed to migrate the schema")?;
 
     Ok(conn)
 }
@@ -28,20 +28,74 @@ fn configure(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
-fn create_tables(conn: &Connection) -> Result<()> {
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS playlists (
-            id INTEGER PRIMARY KEY,
-            name TEXT NOT NULL,
-            url TEXT NOT NULL,
-            channel_name TEXT NOT NULL,
-            thumbnail_url TEXT NOT NULL,
-            views INTEGER NOT NULL,
-            last_updated_at TEXT,
-            last_synced_at TEXT
-        )",
-        [],
-    )?;
+const SCHEMA_VERSION: i64 = 1;
+
+const V1: &str = "
+    CREATE TABLE IF NOT EXISTS playlists (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        url TEXT NOT NULL,
+        channel_name TEXT NOT NULL,
+        thumbnail_url TEXT NOT NULL,
+        views INTEGER NOT NULL,
+        last_updated_at TEXT,
+        last_synced_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS channels (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        icon TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS videos (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        thumbnail TEXT NOT NULL,
+        channel_id TEXT REFERENCES channels(id) ON DELETE SET NULL,
+        duration INTEGER NOT NULL,
+        views INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS playlist_videos (
+        playlist_id INTEGER NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+        video_id TEXT NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+        position INTEGER NOT NULL,
+        PRIMARY KEY (playlist_id, position)
+    );
+
+    CREATE INDEX IF NOT EXISTS playlist_videos_video
+        ON playlist_videos (video_id);
+
+    CREATE TABLE IF NOT EXISTS playlist_skipped (
+        playlist_id INTEGER NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+        entry_index INTEGER NOT NULL,
+        video_id TEXT,
+        reason TEXT NOT NULL,
+        detail TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS playlist_skipped_playlist
+        ON playlist_skipped (playlist_id);
+";
+
+fn migrate(conn: &Connection) -> Result<()> {
+    let version: i64 = conn
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .context("failed to read user_version")?;
+
+    if version >= SCHEMA_VERSION {
+        return Ok(());
+    }
+
+    if version < 1 {
+        conn.execute_batch(V1).context("failed to apply v1")?;
+    }
+
+    conn.pragma_update(None, "user_version", SCHEMA_VERSION)
+        .context("failed to set user_version")?;
+
+    log::info!("migrated the schema from version {version} to {SCHEMA_VERSION}");
 
     Ok(())
 }

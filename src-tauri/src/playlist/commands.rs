@@ -4,7 +4,7 @@ use url::Url;
 use super::Playlist;
 use crate::{
     state::AppState,
-    video::{fetch_for_playlist, PlaylistVideos},
+    video::{fetch_for_playlist, repo as video_repo, PlaylistVideos},
 };
 
 const ALLOWED_HOSTS: [&str; 6] = [
@@ -87,8 +87,17 @@ pub async fn playlist_fetch_videos(
         let playlist = super::get_by_id(&conn, id).map_err(|e| e.to_string())?;
         extract_list_id(&playlist.url)?
     };
-    fetch_for_playlist(list_id)
+    let fetched = fetch_for_playlist(list_id)
         .await
         .inspect_err(|e| log::error!("failed to fetch videos for playlist {id}: {e:#}"))
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    if fetched.outcome.complete {
+        let mut conn = state.db.lock().map_err(|e| e.to_string())?;
+        video_repo::save_fetched(&mut conn, id, &fetched)
+            .inspect_err(|e| log::error!("failed to save videos for playlist {id}: {e:#}"))
+            .map_err(|e| e.to_string())?;
+    }
+
+    Ok(fetched)
 }

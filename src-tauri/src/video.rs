@@ -1,3 +1,5 @@
+pub mod repo;
+
 use anyhow::Result;
 use rusty_ytdl::search::{self, FetchStop, PlaylistSearchOptions, SkipReason};
 use serde::{Deserialize, Serialize};
@@ -19,12 +21,12 @@ pub struct Channel {
     pub icon: String,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SkippedVideo {
     pub index: usize,
     pub video_id: Option<String>,
-    pub reason: &'static str,
+    pub reason: String,
     pub detail: Option<String>,
 }
 
@@ -58,7 +60,7 @@ impl SkippedVideo {
         Self {
             index: entry.index,
             video_id: entry.video_id.clone(),
-            reason,
+            reason: reason.to_string(),
             detail,
         }
     }
