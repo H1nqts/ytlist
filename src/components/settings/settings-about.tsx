@@ -1,5 +1,4 @@
-import { ListMusicIcon } from "lucide-react"
-
+import { AppIcon } from "@/components/ui/app-icon"
 import { Separator } from "@/components/ui/separator"
 import { SettingsUpdate } from "@/components/settings/settings-update"
 import { getVersion } from '@tauri-apps/api/app'
@@ -55,9 +54,7 @@ export function SettingsAbout() {
 
   return (
     <div className="flex flex-col items-center gap-3 py-6 text-center">
-      <div className="flex size-14 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-        <ListMusicIcon className="size-7" />
-      </div>
+      <AppIcon className="size-14 rounded-xl" />
       <div>
         <p className="font-heading text-lg font-semibold">ytlist</p>
         <p className="text-xs text-muted-foreground">Version {version}</p>

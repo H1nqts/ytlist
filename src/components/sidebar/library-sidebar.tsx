@@ -1,5 +1,6 @@
-import { SettingsIcon, ListMusicIcon } from "lucide-react"
+import { SettingsIcon } from "lucide-react"
 
+import { AppIcon } from "@/components/ui/app-icon"
 import { Button } from "@/components/ui/button"
 import {
   Tooltip,
@@ -19,9 +20,7 @@ export function LibrarySidebar({ onOpenSettings }: LibrarySidebarProps) {
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between gap-2 px-4 pt-4 pb-3">
         <div className="flex items-center gap-2">
-          <div className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <ListMusicIcon className="size-4" />
-          </div>
+          <AppIcon />
           <span className="font-heading text-sm font-semibold">ytlist</span>
         </div>
         <Tooltip>
