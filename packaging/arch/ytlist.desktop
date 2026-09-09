@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=ytlist
+GenericName=Playlist Player
+Comment=Browse and play your online playlists
+Exec=ytlist
+Icon=ytlist
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+Keywords=playlist;music;audio;player;stream;
+StartupNotify=true
+StartupWMClass=ytlist
