@@ -68,10 +68,26 @@ pub struct StreamInfo {
     pub expires_at: Option<i64>,
 }
 
+#[derive(Debug, Clone)]
+enum Source {
+    /// Owned by the system package manager. Never updated in place.
+    System(PathBuf),
+    /// Downloaded into the app data dir. Safe to self-update.
+    Managed(PathBuf),
+}
+
+impl Source {
+    fn path(&self) -> &Path {
+        match self {
+            Source::System(path) | Source::Managed(path) => path,
+        }
+    }
+}
+
 pub struct Manager {
     app: AppHandle,
     dir: PathBuf,
-    bin: Mutex<Option<PathBuf>>,
+    bin: Mutex<Option<Source>>,
     status: std::sync::Mutex<Status>,
 }
 
@@ -108,21 +124,30 @@ impl Manager {
 
     pub async fn ensure(&self) -> Result<PathBuf> {
         let mut bin = self.bin.lock().await;
-        if let Some(path) = bin.as_ref() {
-            return Ok(path.clone());
+        if let Some(source) = bin.as_ref() {
+            return Ok(source.path().to_owned());
         }
 
-        let path = self.dir.join(BIN_NAME);
-        let resolved = if path.is_file() {
-            self.update(&path).await
-        } else {
-            self.download().await
+        let resolved = match system_bin() {
+            Some(path) => {
+                log::info!("using yt-dlp from PATH: {}", path.display());
+                Ok(Source::System(path))
+            }
+            None => {
+                let path = self.dir.join(BIN_NAME);
+                if path.is_file() {
+                    self.update(&path).await.map(Source::Managed)
+                } else {
+                    self.download().await.map(Source::Managed)
+                }
+            }
         };
 
         match resolved {
-            Ok(path) => {
+            Ok(source) => {
+                let path = source.path().to_owned();
                 self.set_status(Status::new(State::Ready));
-                *bin = Some(path.clone());
+                *bin = Some(source);
                 Ok(path)
             }
             Err(e) => {
@@ -202,6 +227,23 @@ impl Manager {
             Err(e) => Err(e),
         }
     }
+}
+
+#[cfg(unix)]
+fn system_bin() -> Option<PathBuf> {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let path = std::env::var_os("PATH")?;
+    std::env::split_paths(&path).find_map(|dir| {
+        let candidate = dir.join(BIN_NAME);
+        let meta = candidate.metadata().ok()?;
+        (meta.is_file() && meta.permissions().mode() & 0o111 != 0).then_some(candidate)
+    })
+}
+
+#[cfg(not(unix))]
+fn system_bin() -> Option<PathBuf> {
+    None
 }
 
 fn validate_video_id(id: &str) -> Result<()> {
