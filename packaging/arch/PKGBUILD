@@ -36,7 +36,6 @@ build() {
   cd "${_repo}"
   export VITE_SELF_UPDATE=0
   export RUSTUP_TOOLCHAIN=stable
-  export CARGO_TARGET_DIR=src-tauri/target
   ./node_modules/.bin/tauri build --no-bundle
 }
 
