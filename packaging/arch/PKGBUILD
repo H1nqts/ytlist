@@ -1,7 +1,7 @@
 # Maintainer: H1nqts <tkaqua27@gmail.com>
 
 pkgname=ytlist
-pkgver=0.1.1
+pkgver=0.2.0
 pkgrel=1
 pkgdesc='A desktop client for browsing and playing online playlists'
 arch=('x86_64')
