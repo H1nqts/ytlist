@@ -2,7 +2,7 @@ import * as React from "react"
 import { toast } from "sonner"
 
 import { logError } from "@/lib/logger"
-import { checkForUpdate } from "@/lib/updater"
+import { checkForUpdate, SELF_UPDATE_ENABLED } from "@/lib/updater"
 import { AppShell } from "@/components/layout/app-shell"
 import { LibrarySidebar } from "@/components/sidebar/library-sidebar"
 import { TrackView } from "@/components/tracks/track-view"
@@ -23,7 +23,9 @@ function App() {
       .then((update) => {
         if (cancelled || !update) return
         toast.message(`ytlist ${update.version} is available`, {
-          description: "Open Settings › About to install it.",
+          description: SELF_UPDATE_ENABLED
+            ? "Open Settings › About to install it."
+            : "Re-run the install command to update.",
         })
       })
       .catch((err) => logError("Failed to check for updates", err))

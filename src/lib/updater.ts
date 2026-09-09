@@ -3,6 +3,10 @@ import { relaunch } from "@tauri-apps/plugin-process"
 
 export type { Update }
 
+// Off in builds installed by a package manager, which owns the files an
+// in-app install would overwrite.
+export const SELF_UPDATE_ENABLED = import.meta.env.VITE_SELF_UPDATE !== "0"
+
 export interface DownloadProgress {
   downloaded: number
   total: number | null

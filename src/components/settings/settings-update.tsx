@@ -9,9 +9,13 @@ import {
   checkForUpdate,
   installUpdate,
   relaunch,
+  SELF_UPDATE_ENABLED,
   type DownloadProgress,
   type Update,
 } from "@/lib/updater"
+
+const INSTALL_COMMAND =
+  "curl -fsSL https://raw.githubusercontent.com/H1nqts/ytlist/main/packaging/arch/install.sh | sh"
 
 type Status = "idle" | "checking" | "available" | "downloading" | "installed"
 
@@ -125,10 +129,21 @@ export function SettingsUpdate() {
   if (status === "available" && update) {
     return (
       <div className="flex flex-col items-center gap-1.5">
-        <Button size="sm" onClick={onInstall}>
-          <DownloadIcon />
-          Update to {update.version}
-        </Button>
+        {SELF_UPDATE_ENABLED ? (
+          <Button size="sm" onClick={onInstall}>
+            <DownloadIcon />
+            Update to {update.version}
+          </Button>
+        ) : (
+          <>
+            <p className="text-xs text-muted-foreground">
+              Run this to update to {update.version}:
+            </p>
+            <code className="w-full rounded bg-muted px-2 py-1 text-xs break-all select-text">
+              {INSTALL_COMMAND}
+            </code>
+          </>
+        )}
         <p className="text-xs text-muted-foreground">You're on {update.currentVersion}.</p>
       </div>
     )
