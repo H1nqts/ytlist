@@ -9,6 +9,10 @@ on:
         description: Create the release as a draft
         type: boolean
         default: true
+      prerelease:
+        description: Mark the release as a prerelease
+        type: boolean
+        default: false
 
 jobs:
   verify-version:
@@ -80,11 +84,11 @@ jobs:
           releaseName: ytlist ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
           releaseBody: See the assets to download this version and install.
           releaseDraft: ${{ github.ref_type != 'tag' && inputs.draft || false }}
-          prerelease: false
+          prerelease: ${{ github.ref_type != 'tag' && inputs.prerelease || false }}
 
   arch-package:
     needs: [release]
-    if: always() && needs.release.result == 'success' && startsWith(github.ref, 'refs/tags/v')
+    if: always() && needs.release.result == 'success'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -125,4 +129,10 @@ jobs:
         working-directory: packaging/arch
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "$GITHUB_REF_NAME" ./*.pkg.tar.zst --clobber
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="v$(node -p "require('../../package.json').version")"
+          fi
+          gh release upload "$tag" ./*.pkg.tar.zst --clobber
