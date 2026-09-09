@@ -1,0 +1,65 @@
+# Maintainer: H1nqts <tkaqua27@gmail.com>
+
+pkgname=ytlist
+pkgver=0.1.1
+pkgrel=1
+pkgdesc='A desktop client for browsing and playing online playlists'
+arch=('x86_64')
+url='https://github.com/H1nqts/ytlist'
+license=('MIT')
+depends=(
+  'webkit2gtk-4.1'
+  'gtk3'
+  'yt-dlp'
+  'gst-plugins-base'
+  'gst-plugins-good'
+  'gst-plugins-bad'
+)
+makedepends=('rust' 'nodejs' 'npm' 'pkgconf' 'git')
+optdepends=(
+  'deno: JavaScript runtime required by yt-dlp for some extractions'
+  'gst-libav: additional audio decoders'
+)
+options=('!lto' '!debug')
+source=()
+sha256sums=()
+
+_repo="$(realpath "${startdir}/../..")"
+
+prepare() {
+  cd "${_repo}"
+  npm ci
+  cargo fetch --locked --manifest-path src-tauri/Cargo.toml
+}
+
+build() {
+  cd "${_repo}"
+  export VITE_SELF_UPDATE=0
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=src-tauri/target
+  ./node_modules/.bin/tauri build --no-bundle
+}
+
+package() {
+  cd "${_repo}"
+
+  install -Dm755 src-tauri/target/release/ytlist \
+    "${pkgdir}/usr/bin/ytlist"
+
+  install -Dm644 packaging/arch/ytlist.desktop \
+    "${pkgdir}/usr/share/applications/ytlist.desktop"
+
+  install -Dm644 src-tauri/icons/32x32.png \
+    "${pkgdir}/usr/share/icons/hicolor/32x32/apps/ytlist.png"
+  install -Dm644 src-tauri/icons/64x64.png \
+    "${pkgdir}/usr/share/icons/hicolor/64x64/apps/ytlist.png"
+  install -Dm644 src-tauri/icons/128x128.png \
+    "${pkgdir}/usr/share/icons/hicolor/128x128/apps/ytlist.png"
+  install -Dm644 'src-tauri/icons/128x128@2x.png' \
+    "${pkgdir}/usr/share/icons/hicolor/256x256/apps/ytlist.png"
+  install -Dm644 src-tauri/icons/icon.png \
+    "${pkgdir}/usr/share/icons/hicolor/512x512/apps/ytlist.png"
+
+  install -Dm644 LICENSE \
+    "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}
