@@ -12,32 +12,41 @@ export function useRowWindow(
   pitch: number,
   overscan: number
 ): RowWindow {
-  const [range, setRange] = React.useState({ scrollTop: 0, height: 0 })
+  /** Derived rather than raw scroll metrics: scrolling within one row's pitch
+   *  resolves to the same window, and re-rendering then remounts every row. */
+  const [window, setWindow] = React.useState({ start: 0, end: 0 })
+
+  const shape = React.useRef({ count, pitch, overscan })
+  shape.current = { count, pitch, overscan }
 
   React.useLayoutEffect(() => {
     const viewport = viewportRef.current
     if (!viewport) return
 
-    const read = () =>
-      setRange({ scrollTop: viewport.scrollTop, height: viewport.clientHeight })
+    const measure = () => {
+      const { count, pitch, overscan } = shape.current
+      const first = Math.floor(viewport.scrollTop / pitch)
+      const visible = Math.ceil(viewport.clientHeight / pitch)
+      const start = Math.max(0, first - overscan)
+      const end = Math.min(count, first + visible + overscan)
+      setWindow((current) =>
+        current.start === start && current.end === end ? current : { start, end }
+      )
+    }
 
-    read()
-    viewport.addEventListener("scroll", read, { passive: true })
-    const observer = new ResizeObserver(read)
+    measure()
+    viewport.addEventListener("scroll", measure, { passive: true })
+    const observer = new ResizeObserver(measure)
     observer.observe(viewport)
     return () => {
-      viewport.removeEventListener("scroll", read)
+      viewport.removeEventListener("scroll", measure)
       observer.disconnect()
     }
-  }, [viewportRef])
-
-  const first = Math.floor(range.scrollTop / pitch)
-  const visible = Math.ceil(range.height / pitch)
-  const start = Math.max(0, first - overscan)
+  }, [viewportRef, count, pitch, overscan])
 
   return {
-    start,
-    end: Math.min(count, first + visible + overscan),
-    offsetTop: start * pitch,
+    start: window.start,
+    end: window.end,
+    offsetTop: window.start * pitch,
   }
 }
