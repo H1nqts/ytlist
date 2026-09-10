@@ -118,6 +118,12 @@ function TrackRows({ tracks, allTracks, playlistId }: TrackRowsProps) {
     OVERSCAN
   )
 
+  const positions = React.useMemo(() => {
+    const map = new Map<Track, number>()
+    allTracks.forEach((track, i) => map.set(track, i))
+    return map
+  }, [allTracks])
+
   return (
     <ScrollArea viewportRef={viewportRef} className="h-full">
       <div className="@container px-3 pb-4">
@@ -128,7 +134,7 @@ function TrackRows({ tracks, allTracks, playlistId }: TrackRowsProps) {
               key={`${start + i}:${track.id}`}
               track={track}
               index={start + i}
-              trackIndex={allTracks.indexOf(track)}
+              trackIndex={positions.get(track) ?? -1}
               playlistId={playlistId}
             />
           ))}
