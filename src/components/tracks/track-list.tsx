@@ -129,15 +129,18 @@ function TrackRows({ tracks, allTracks, playlistId }: TrackRowsProps) {
       <div className="@container px-3 pb-4">
         <div style={{ height: offsetTop }} />
         <div className="flex flex-col gap-0.5">
-          {tracks.slice(start, end).map((track, i) => (
-            <TrackRow
-              key={`${start + i}:${track.id}`}
-              track={track}
-              index={start + i}
-              trackIndex={positions.get(track) ?? -1}
-              playlistId={playlistId}
-            />
-          ))}
+          {tracks.slice(start, end).map((track, i) => {
+            const trackIndex = positions.get(track) ?? -1
+            return (
+              <TrackRow
+                key={`${trackIndex}:${track.id}`}
+                track={track}
+                index={start + i}
+                trackIndex={trackIndex}
+                playlistId={playlistId}
+              />
+            )
+          })}
         </div>
         <div style={{ height: (tracks.length - end) * ROW_PITCH }} />
       </div>

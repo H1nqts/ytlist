@@ -16,6 +16,9 @@ interface ThumbnailProps extends React.ComponentProps<"div"> {
 function Thumbnail({ src, alt, className, ...props }: ThumbnailProps) {
   const [failed, setFailed] = React.useState(false)
 
+  /** The element is reused across tracks, so a new URL gets a fresh attempt. */
+  React.useEffect(() => setFailed(false), [src])
+
   return (
     <div
       data-slot="thumbnail"
