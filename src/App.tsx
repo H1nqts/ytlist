@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import { logError } from "@/lib/logger"
 import { checkForUpdate, SELF_UPDATE_ENABLED } from "@/lib/updater"
 import { AppShell } from "@/components/layout/app-shell"
+import { KeyboardShortcuts } from "@/components/layout/keyboard-shortcuts"
 import { LibrarySidebar } from "@/components/sidebar/library-sidebar"
 import { TrackView } from "@/components/tracks/track-view"
 import { PlayerBar } from "@/components/player/player-bar"
@@ -45,6 +46,7 @@ function App() {
       <QueuePanel open={queueOpen} onOpenChange={setQueueOpen} />
       <SettingsPanel open={settingsOpen} onOpenChange={setSettingsOpen} />
       <Toaster richColors position="bottom-right" />
+      <KeyboardShortcuts />
     </>
   )
 }
