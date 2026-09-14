@@ -7,6 +7,7 @@ import {
   libraryReducer,
 } from "@/state/library-reducer"
 import {
+  playbackGet,
   playlistAdd,
   playlistDelete,
   playlistFetchVideos,
@@ -65,10 +66,11 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
   const selectedIdRef = React.useRef(state.selectedPlaylistId)
   selectedIdRef.current = state.selectedPlaylistId
 
-  const reloadPlaylists = React.useCallback(async () => {
+  const reloadPlaylists = React.useCallback(async (restoreId?: number | null) => {
     const rows = await playlistGetAll()
     const playlists = rows.map(toUiPlaylist)
     const selectedPlaylistId =
+      playlists.find((p) => p.id === restoreId)?.id ??
       playlists.find((p) => p.id === selectedIdRef.current)?.id ??
       playlists[0]?.id ??
       null
@@ -81,14 +83,21 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     let cancelled = false
     const frame = requestAnimationFrame(() => {
-      reloadPlaylists().catch((err) => {
-        if (cancelled) return
-        logError("Failed to load playlists", err)
-        dispatch({ type: "INITIAL_LOAD_FAILED" })
-        toast.error("Couldn't load your playlists", {
-          description: String(err),
+      playbackGet()
+        .then((saved) => saved.currentPlaylistId)
+        .catch(() => null)
+        .then((restoreId) => {
+          if (cancelled) return
+          return reloadPlaylists(restoreId)
         })
-      })
+        .catch((err) => {
+          if (cancelled) return
+          logError("Failed to load playlists", err)
+          dispatch({ type: "INITIAL_LOAD_FAILED" })
+          toast.error("Couldn't load your playlists", {
+            description: String(err),
+          })
+        })
     })
     return () => {
       cancelled = true
