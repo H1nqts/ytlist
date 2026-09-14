@@ -95,6 +95,7 @@ interface PlayerContextValue {
   next: () => void
   prev: () => void
   seek: (progressSec: number) => void
+  seekBy: (deltaSec: number) => void
   setVolume: (volume: number) => void
   toggleMute: () => void
   toggleShuffle: () => void
@@ -209,6 +210,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       audio.currentTime = next
       setProgressSec(next)
     }
+  }, [])
+  const seekBy = React.useCallback((deltaSec: number) => {
+    const audio = getAudio()
+    if (!audio) return
+    const upper = Number.isFinite(audio.duration) ? audio.duration : Infinity
+    const next = Math.min(Math.max(audio.currentTime + deltaSec, 0), upper)
+    audio.currentTime = next
+    setProgressSec(next)
   }, [])
   const setVolume = React.useCallback(
     (volume: number) => dispatch({ type: "SET_VOLUME", volume }),
@@ -635,6 +644,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       next,
       prev,
       seek,
+      seekBy,
       setVolume,
       toggleMute,
       toggleShuffle,
@@ -655,6 +665,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       next,
       prev,
       seek,
+      seekBy,
       setVolume,
       toggleMute,
       toggleShuffle,
