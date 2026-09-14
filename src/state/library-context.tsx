@@ -62,10 +62,17 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
   const justAdded = React.useRef(new Set<number>())
   const [looseTracks, setLooseTracks] = React.useState(new Map<string, Track>())
 
-  // Reload the full playlist set from the backend (source of truth).
+  const selectedIdRef = React.useRef(state.selectedPlaylistId)
+  selectedIdRef.current = state.selectedPlaylistId
+
   const reloadPlaylists = React.useCallback(async () => {
     const rows = await playlistGetAll()
-    dispatch({ type: "SET_PLAYLISTS", playlists: rows.map(toUiPlaylist) })
+    const playlists = rows.map(toUiPlaylist)
+    const selectedPlaylistId =
+      playlists.find((p) => p.id === selectedIdRef.current)?.id ??
+      playlists[0]?.id ??
+      null
+    dispatch({ type: "SET_PLAYLISTS", playlists, selectedPlaylistId })
   }, [])
 
   // Load saved playlists from the backend once on mount, but only after the

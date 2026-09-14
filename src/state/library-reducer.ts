@@ -7,7 +7,11 @@ import type {
 } from "@/types"
 
 export type LibraryAction =
-  | { type: "SET_PLAYLISTS"; playlists: Playlist[] }
+  | {
+      type: "SET_PLAYLISTS"
+      playlists: Playlist[]
+      selectedPlaylistId: number | null
+    }
   | { type: "INITIAL_LOAD_FAILED" }
   | { type: "ADD_PLAYLIST"; playlist: Playlist }
   | { type: "REPLACE_PLAYLIST"; placeholderId: number; playlist: Playlist }
@@ -54,11 +58,7 @@ export function libraryReducer(
       return {
         ...state,
         playlists: action.playlists,
-        // Keep the current selection if it still exists, else select the first.
-        selectedPlaylistId:
-          action.playlists.find((p) => p.id === state.selectedPlaylistId)?.id ??
-          action.playlists[0]?.id ??
-          null,
+        selectedPlaylistId: action.selectedPlaylistId,
         initialLoading: false,
       }
 
