@@ -38,6 +38,24 @@ function trim(value: number): string {
   return value.toFixed(1).replace(/\.0$/, "")
 }
 
+/** "2026-09-15" -> "Sep 15" */
+export function formatShortDate(date: string): string {
+  const [y, m, d] = date.split("-").map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  })
+}
+
+/** "2026-09" -> "September 2026" */
+export function formatMonth(month: string): string {
+  const [y, m] = month.split("-").map(Number)
+  return new Date(y, m - 1, 1).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  })
+}
+
 /** ISO timestamp -> "just now" / "5 min ago" / "2 days ago" / "3 weeks ago" */
 export function formatRelative(iso: string, now: number = Date.now()): string {
   const then = new Date(iso).getTime()
