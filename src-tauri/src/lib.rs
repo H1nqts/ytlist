@@ -5,6 +5,7 @@ mod playback;
 mod playlist;
 mod settings;
 mod state;
+mod stats;
 mod video;
 mod ytdlp;
 
