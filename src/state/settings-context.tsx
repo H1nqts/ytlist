@@ -18,6 +18,7 @@ const defaultSettings: AppSettings = {
   muted: false,
   shuffle: false,
   repeat: "off",
+  statsEnabled: false,
 }
 
 const SettingsContext = React.createContext<SettingsContextValue | null>(null)

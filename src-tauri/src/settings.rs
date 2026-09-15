@@ -41,6 +41,8 @@ pub struct Settings {
     pub shuffle: bool,
     #[serde(default)]
     pub repeat: RepeatMode,
+    #[serde(default)]
+    pub stats_enabled: bool,
 }
 
 impl Default for Settings {
@@ -51,6 +53,7 @@ impl Default for Settings {
             muted: false,
             shuffle: false,
             repeat: RepeatMode::default(),
+            stats_enabled: false,
         }
     }
 }
@@ -68,6 +71,8 @@ pub struct SettingsPatch {
     pub shuffle: Option<bool>,
     #[serde(default)]
     pub repeat: Option<RepeatMode>,
+    #[serde(default)]
+    pub stats_enabled: Option<bool>,
 }
 
 impl Settings {
@@ -86,6 +91,9 @@ impl Settings {
         }
         if let Some(value) = patch.repeat {
             self.repeat = value;
+        }
+        if let Some(value) = patch.stats_enabled {
+            self.stats_enabled = value;
         }
     }
 }

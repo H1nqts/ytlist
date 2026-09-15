@@ -128,6 +128,89 @@ export function playbackSet(playback: Playback): Promise<void> {
   return invoke<void>("playback_set", { playback })
 }
 
+export type StatsRange = "last7Days" | "last30Days" | "month" | "all"
+
+export interface PlayRecord {
+  videoId: string
+  title: string
+  channelId: string | null
+  channelName: string
+  playlistId: number | null
+  playlistName: string | null
+  /** RFC3339 */
+  startedAt: string
+  listenedMs: number
+  durationMs: number
+  completed: boolean
+}
+
+export interface StatsSummary {
+  playCount: number
+  completedCount: number
+  listenedMs: number
+  uniqueTracks: number
+  uniqueChannels: number
+  activeDays: number
+}
+
+export interface TrackStat {
+  videoId: string
+  title: string
+  channelName: string
+  thumbnail: string | null
+  playCount: number
+  completedCount: number
+  listenedMs: number
+}
+
+export interface ChannelStat {
+  channelId: string | null
+  channelName: string
+  icon: string | null
+  playCount: number
+  listenedMs: number
+}
+
+export interface DailyStat {
+  /** Days with no play are absent, so callers fill the gaps themselves. */
+  date: string
+  playCount: number
+  listenedMs: number
+}
+
+export interface PlaylistStat {
+  playlistId: number | null
+  name: string
+  present: boolean
+  playCount: number
+  listenedMs: number
+}
+
+export interface StatsOverview {
+  summary: StatsSummary
+  topTracks: TrackStat[]
+  topChannels: ChannelStat[]
+  daily: DailyStat[]
+  playlists: PlaylistStat[]
+  /** "YYYY-MM", newest first. */
+  availableMonths: string[]
+}
+
+export function statsRecord(record: PlayRecord): Promise<void> {
+  return invoke<void>("stats_record", { record })
+}
+
+export function statsOverview(
+  range: StatsRange,
+  month?: string
+): Promise<StatsOverview> {
+  return invoke<StatsOverview>("stats_overview", { range, month: month ?? null })
+}
+
+export function statsClear(): Promise<void> {
+  return invoke<void>("stats_clear")
+}
+
 export function logDirGet(): Promise<string> {
   return invoke<string>("log_dir_get")
 }

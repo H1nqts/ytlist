@@ -107,4 +107,5 @@ export interface AppSettings {
   muted: boolean
   shuffle: boolean
   repeat: RepeatMode
+  statsEnabled: boolean
 }
