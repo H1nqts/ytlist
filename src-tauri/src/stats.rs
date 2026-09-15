@@ -17,7 +17,6 @@ const TOP_LIMIT: usize = 10;
 pub struct PlayRecord {
     pub video_id: String,
     pub title: String,
-    pub channel_id: Option<String>,
     pub channel_name: String,
     pub playlist_id: Option<i64>,
     pub playlist_name: Option<String>,

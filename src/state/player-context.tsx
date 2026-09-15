@@ -22,6 +22,7 @@ import {
   type YtdlpStatus,
 } from "@/lib/api"
 import { logError } from "@/lib/logger"
+import { usePlayStats } from "@/hooks/use-play-stats"
 
 const YTDLP_STATUS_EVENT = "ytdlp://status"
 
@@ -293,21 +294,53 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     []
   )
 
+  const getPlaylistName = React.useCallback(
+    (playlistId: number) => getPlaylist(playlistId)?.title,
+    [getPlaylist]
+  )
+
+  const stats = usePlayStats({
+    enabled: settings.statsEnabled,
+    getTrack,
+    getPlaylistName,
+    currentPlaylistId: state.currentPlaylistId,
+  })
+
+  // Recording starts and stops with the setting, mid-track included: the part
+  // played while it was off is never stored.
+  React.useEffect(() => {
+    if (!settings.statsEnabled) {
+      stats.discard()
+      return
+    }
+    const trackId = stateRef.current.currentTrackId
+    if (trackId) stats.start(trackId, getAudio()?.currentTime ?? 0)
+  }, [settings.statsEnabled, stats])
+
   // Latest values for the audio listeners, which are bound once.
   const handlers = React.useRef({
     next,
     repeat: state.repeat,
     isPlaying: state.isPlaying,
+    stats,
   })
   React.useEffect(() => {
-    handlers.current = { next, repeat: state.repeat, isPlaying: state.isPlaying }
-  }, [next, state.repeat, state.isPlaying])
+    handlers.current = {
+      next,
+      repeat: state.repeat,
+      isPlaying: state.isPlaying,
+      stats,
+    }
+  }, [next, state.repeat, state.isPlaying, stats])
 
   React.useEffect(() => {
     const audio = getAudio()
     if (!audio) return
 
-    const onTimeUpdate = () => setProgressSec(audio.currentTime)
+    const onTimeUpdate = () => {
+      setProgressSec(audio.currentTime)
+      handlers.current.stats.onTimeUpdate(audio.currentTime)
+    }
 
     const onLoadedMetadata = () => {
       if (Number.isFinite(audio.duration)) {
@@ -316,8 +349,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
 
     const onEnded = () => {
+      handlers.current.stats.finish(true)
       if (handlers.current.repeat === "one") {
         audio.currentTime = 0
+        // Repeating keeps the same track, so no load effect runs to reopen it.
+        const repeated = stateRef.current.currentTrackId
+        if (repeated) handlers.current.stats.start(repeated, 0)
         void audio.play().catch(() => {})
         return
       }
@@ -478,8 +515,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const flushAll = React.useCallback(() => {
     flushSettings()
-    return flushPlayback()
-  }, [flushSettings, flushPlayback])
+    return Promise.all([flushPlayback(), stats.flush()]).then(() => {})
+  }, [flushSettings, flushPlayback, stats])
 
   React.useEffect(() => {
     const unlisten = listen(FLUSH_EVENT, () => {
@@ -499,6 +536,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const trackId = state.currentTrackId
 
   React.useEffect(() => {
+    stats.finish(false)
+    if (trackId) stats.start(trackId)
+
     const audio = getAudio()
     if (!audio || !trackId) return
 
@@ -540,7 +580,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: "PAUSE" })
         toast.error("Couldn't play this track", { description: String(err) })
       })
-  }, [trackId, resolveStream])
+  }, [trackId, resolveStream, stats])
 
   // Resolve the next few queued tracks ahead of time, so switching to them hits
   // the cache instead of waiting on yt-dlp.

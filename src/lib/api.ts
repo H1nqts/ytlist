@@ -133,7 +133,6 @@ export type StatsRange = "last7Days" | "last30Days" | "month" | "all"
 export interface PlayRecord {
   videoId: string
   title: string
-  channelId: string | null
   channelName: string
   playlistId: number | null
   playlistName: string | null
