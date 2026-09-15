@@ -1,7 +1,7 @@
 import * as React from "react"
 import { toast } from "sonner"
 
-import type { LibraryState, Playlist, Track } from "@/types"
+import type { LibraryState, MainView, Playlist, Track } from "@/types"
 import {
   initialLibraryState,
   libraryReducer,
@@ -32,6 +32,9 @@ interface LibraryContextValue {
   renamePlaylist: (playlistId: number, title: string) => void
   selectPlaylist: (playlistId: number) => void
   setSearch: (search: string) => void
+  /** Which view fills the main area; selecting a playlist returns to "tracks". */
+  view: MainView
+  setView: (view: MainView) => void
   getPlaylist: (playlistId: number) => Playlist | undefined
   getTrack: (trackId: string) => Track | undefined
   /**
@@ -274,6 +277,10 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     (search: string) => dispatch({ type: "SET_SEARCH", search }),
     []
   )
+  const setView = React.useCallback(
+    (view: MainView) => dispatch({ type: "SET_VIEW", view }),
+    []
+  )
 
   const selectedPlaylist = React.useMemo(
     () => state.playlists.find((p) => p.id === state.selectedPlaylistId) ?? null,
@@ -324,6 +331,8 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       renamePlaylist,
       selectPlaylist,
       setSearch,
+      view: state.view,
+      setView,
       getPlaylist,
       getTrack,
       addLooseTracks,
@@ -339,6 +348,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
       renamePlaylist,
       selectPlaylist,
       setSearch,
+      setView,
       getPlaylist,
       getTrack,
       addLooseTracks,

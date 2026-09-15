@@ -6,7 +6,7 @@ import { checkForUpdate, SELF_UPDATE_ENABLED } from "@/lib/updater"
 import { AppShell } from "@/components/layout/app-shell"
 import { KeyboardShortcuts } from "@/components/layout/keyboard-shortcuts"
 import { LibrarySidebar } from "@/components/sidebar/library-sidebar"
-import { TrackView } from "@/components/tracks/track-view"
+import { MainView } from "@/components/layout/main-view"
 import { PlayerBar } from "@/components/player/player-bar"
 import { QueuePanel } from "@/components/queue/queue-panel"
 import { SettingsPanel } from "@/components/settings/settings-panel"
@@ -40,7 +40,7 @@ function App() {
     <>
       <AppShell
         sidebar={<LibrarySidebar onOpenSettings={() => setSettingsOpen(true)} />}
-        main={<TrackView />}
+        main={<MainView />}
         player={<PlayerBar onToggleQueue={() => setQueueOpen((v) => !v)} queueOpen={queueOpen} />}
       />
       <QueuePanel open={queueOpen} onOpenChange={setQueueOpen} />

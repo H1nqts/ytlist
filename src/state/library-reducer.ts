@@ -1,6 +1,7 @@
 import type {
   FetchOutcome,
   LibraryState,
+  MainView,
   Playlist,
   SkippedVideo,
   Track,
@@ -31,6 +32,7 @@ export type LibraryAction =
   | { type: "RENAME_PLAYLIST"; playlistId: number; title: string }
   | { type: "SELECT_PLAYLIST"; playlistId: number }
   | { type: "SET_SEARCH"; search: string }
+  | { type: "SET_VIEW"; view: MainView }
 
 export const initialLibraryState: LibraryState = {
   // Real playlists are loaded from the backend after the UI binds (SET_PLAYLISTS).
@@ -39,6 +41,7 @@ export const initialLibraryState: LibraryState = {
   search: "",
   // The sidebar shows a loading state until the first load resolves.
   initialLoading: true,
+  view: "tracks",
 }
 
 function mapPlaylist(
@@ -71,6 +74,7 @@ export function libraryReducer(
         playlists: [action.playlist, ...state.playlists],
         selectedPlaylistId: action.playlist.id,
         search: "",
+        view: "tracks",
       }
 
     case "REPLACE_PLAYLIST": {
@@ -166,10 +170,14 @@ export function libraryReducer(
         ...state,
         selectedPlaylistId: action.playlistId,
         search: "",
+        view: "tracks",
       }
 
     case "SET_SEARCH":
       return { ...state, search: action.search }
+
+    case "SET_VIEW":
+      return { ...state, view: action.view }
 
     default:
       return state

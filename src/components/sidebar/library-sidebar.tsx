@@ -1,4 +1,4 @@
-import { SettingsIcon } from "lucide-react"
+import { ChartColumnIcon, SettingsIcon } from "lucide-react"
 
 import { AppIcon } from "@/components/ui/app-icon"
 import { Button } from "@/components/ui/button"
@@ -10,12 +10,16 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { AddPlaylistForm } from "@/components/sidebar/add-playlist-form"
 import { PlaylistList } from "@/components/sidebar/playlist-list"
+import { useLibrary } from "@/hooks/use-library"
 
 interface LibrarySidebarProps {
   onOpenSettings: () => void
 }
 
 export function LibrarySidebar({ onOpenSettings }: LibrarySidebarProps) {
+  const { view, setView } = useLibrary()
+  const showingStats = view === "stats"
+
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between gap-2 px-4 pt-4 pb-3">
@@ -23,19 +27,35 @@ export function LibrarySidebar({ onOpenSettings }: LibrarySidebarProps) {
           <AppIcon />
           <span className="font-heading text-sm font-semibold">ytlist</span>
         </div>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              onClick={onOpenSettings}
-              aria-label="Open settings"
-            >
-              <SettingsIcon />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Settings</TooltipContent>
-        </Tooltip>
+        <div className="flex items-center gap-0.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon-sm"
+                variant={showingStats ? "secondary" : "ghost"}
+                aria-pressed={showingStats}
+                onClick={() => setView(showingStats ? "tracks" : "stats")}
+                aria-label="Show listening statistics"
+              >
+                <ChartColumnIcon />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Statistics</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                onClick={onOpenSettings}
+                aria-label="Open settings"
+              >
+                <SettingsIcon />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Settings</TooltipContent>
+          </Tooltip>
+        </div>
       </header>
 
       <div className="px-3 pb-3">

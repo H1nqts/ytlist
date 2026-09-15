@@ -3,6 +3,7 @@
 export type RepeatMode = "off" | "one" | "all"
 export type PlaylistStatus = "idle" | "loading" | "error"
 export type PlayActivation = "single" | "double"
+export type MainView = "tracks" | "stats"
 
 export interface Track {
   id: string
@@ -98,6 +99,7 @@ export interface LibraryState {
   search: string
   /** True until the first `playlist_get_all` load resolves (or fails). */
   initialLoading: boolean
+  view: MainView
 }
 
 export interface AppSettings {
