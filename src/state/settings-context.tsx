@@ -10,6 +10,9 @@ interface SettingsContextValue extends AppSettings {
   loaded: boolean
   updateSettings: (patch: Partial<AppSettings>) => void
   setPlayActivation: (mode: PlayActivation) => void
+  /** Bumped when the history is wiped, so open views know to re-read it. */
+  statsCleared: number
+  notifyStatsCleared: () => void
 }
 
 const defaultSettings: AppSettings = {
@@ -74,9 +77,29 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     [updateSettings]
   )
 
+  const [statsCleared, setStatsCleared] = React.useState(0)
+  const notifyStatsCleared = React.useCallback(
+    () => setStatsCleared((n) => n + 1),
+    []
+  )
+
   const value = React.useMemo<SettingsContextValue>(
-    () => ({ ...settings, loaded, updateSettings, setPlayActivation }),
-    [settings, loaded, updateSettings, setPlayActivation]
+    () => ({
+      ...settings,
+      loaded,
+      updateSettings,
+      setPlayActivation,
+      statsCleared,
+      notifyStatsCleared,
+    }),
+    [
+      settings,
+      loaded,
+      updateSettings,
+      setPlayActivation,
+      statsCleared,
+      notifyStatsCleared,
+    ]
   )
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>

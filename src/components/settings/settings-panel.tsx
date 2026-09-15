@@ -1,4 +1,9 @@
-import { HandIcon, InfoIcon, ScrollTextIcon } from "lucide-react"
+import {
+  ChartColumnIcon,
+  HandIcon,
+  InfoIcon,
+  ScrollTextIcon,
+} from "lucide-react"
 
 import {
   Dialog,
@@ -9,6 +14,7 @@ import {
 } from "@/components/ui/dialog"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { SettingsAccessibility } from "@/components/settings/settings-accessibility"
+import { SettingsStats } from "@/components/settings/settings-stats"
 import { SettingsLogs } from "@/components/settings/settings-logs"
 import { SettingsAbout } from "@/components/settings/settings-about"
 // Hidden for now — kept for later. See SettingsPlayback / SettingsShortcuts.
@@ -46,6 +52,10 @@ export function SettingsPanel({ open, onOpenChange }: SettingsPanelProps) {
               <KeyboardIcon />
               Shortcuts
             </TabsTrigger> */}
+            <TabsTrigger value="stats">
+              <ChartColumnIcon />
+              Statistics
+            </TabsTrigger>
             <TabsTrigger value="logs">
               <ScrollTextIcon />
               Logs
@@ -65,6 +75,9 @@ export function SettingsPanel({ open, onOpenChange }: SettingsPanelProps) {
           <TabsContent value="shortcuts" className="max-h-80 overflow-y-auto pt-2">
             <SettingsShortcuts />
           </TabsContent> */}
+          <TabsContent value="stats" className="pt-2">
+            <SettingsStats />
+          </TabsContent>
           <TabsContent value="logs" className="pt-2">
             <SettingsLogs />
           </TabsContent>

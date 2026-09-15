@@ -32,7 +32,7 @@ function plays(count: number): string {
 }
 
 export function StatsView() {
-  const { statsEnabled } = useSettings()
+  const { statsEnabled, statsCleared } = useSettings()
   const [range, setRange] = React.useState<StatsRange>(DEFAULT_RANGE)
   const [month, setMonth] = React.useState<string | null>(null)
   const [data, setData] = React.useState<StatsOverview | null>(null)
@@ -62,7 +62,7 @@ export function StatsView() {
     return () => {
       cancelled = true
     }
-  }, [range, month, reloads])
+  }, [range, month, reloads, statsCleared])
 
   const onRangeChange = React.useCallback(
     (next: StatsRange, nextMonth: string | null) => {
