@@ -28,7 +28,7 @@ fn configure(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
-const SCHEMA_VERSION: i64 = 1;
+const SCHEMA_VERSION: i64 = 2;
 
 const V1: &str = "
     CREATE TABLE IF NOT EXISTS playlists (
@@ -79,6 +79,37 @@ const V1: &str = "
         ON playlist_skipped (playlist_id);
 ";
 
+// No foreign keys: deleting a playlist or video must not erase what was played.
+const V2: &str = "
+    CREATE TABLE IF NOT EXISTS play_history (
+        id INTEGER PRIMARY KEY,
+        video_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        channel_id TEXT,
+        channel_name TEXT NOT NULL,
+        playlist_id INTEGER,
+        playlist_name TEXT,
+        started_at TEXT NOT NULL,
+        local_date TEXT NOT NULL,
+        local_month TEXT NOT NULL,
+        listened_ms INTEGER NOT NULL,
+        duration_ms INTEGER NOT NULL,
+        completed INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS play_history_local_date
+        ON play_history (local_date);
+
+    CREATE INDEX IF NOT EXISTS play_history_local_month
+        ON play_history (local_month);
+
+    CREATE INDEX IF NOT EXISTS play_history_video
+        ON play_history (video_id);
+
+    CREATE INDEX IF NOT EXISTS play_history_playlist
+        ON play_history (playlist_id);
+";
+
 fn migrate(conn: &Connection) -> Result<()> {
     let version: i64 = conn
         .query_row("PRAGMA user_version", [], |row| row.get(0))
@@ -90,6 +121,10 @@ fn migrate(conn: &Connection) -> Result<()> {
 
     if version < 1 {
         conn.execute_batch(V1).context("failed to apply v1")?;
+    }
+
+    if version < 2 {
+        conn.execute_batch(V2).context("failed to apply v2")?;
     }
 
     conn.pragma_update(None, "user_version", SCHEMA_VERSION)
