@@ -28,7 +28,7 @@ fn configure(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
-const SCHEMA_VERSION: i64 = 2;
+const SCHEMA_VERSION: i64 = 3;
 
 const V1: &str = "
     CREATE TABLE IF NOT EXISTS playlists (
@@ -110,6 +110,14 @@ const V2: &str = "
         ON play_history (playlist_id);
 ";
 
+const V3: &str = "
+    ALTER TABLE play_history ADD COLUMN local_hour INTEGER;
+    ALTER TABLE play_history ADD COLUMN local_weekday INTEGER;
+
+    CREATE INDEX IF NOT EXISTS play_history_local_hour
+        ON play_history (local_hour);
+";
+
 fn migrate(conn: &Connection) -> Result<()> {
     let version: i64 = conn
         .query_row("PRAGMA user_version", [], |row| row.get(0))
@@ -125,6 +133,10 @@ fn migrate(conn: &Connection) -> Result<()> {
 
     if version < 2 {
         conn.execute_batch(V2).context("failed to apply v2")?;
+    }
+
+    if version < 3 {
+        conn.execute_batch(V3).context("failed to apply v3")?;
     }
 
     conn.pragma_update(None, "user_version", SCHEMA_VERSION)

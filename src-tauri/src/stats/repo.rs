@@ -51,17 +51,19 @@ pub fn insert(
     play: &PlayRecord,
     local_date: &str,
     local_month: &str,
+    local_hour: i64,
+    local_weekday: i64,
 ) -> Result<()> {
     // The player has no channel id to send, so take it from the stored video.
     conn.execute(
         "INSERT INTO play_history (
             video_id, title, channel_id, channel_name,
             playlist_id, playlist_name,
-            started_at, local_date, local_month,
+            started_at, local_date, local_month, local_hour, local_weekday,
             listened_ms, duration_ms, completed
          ) VALUES (
             ?1, ?2, (SELECT channel_id FROM videos WHERE id = ?1), ?3,
-            ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11
+            ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13
          )",
         params![
             play.video_id,
@@ -72,6 +74,8 @@ pub fn insert(
             play.started_at,
             local_date,
             local_month,
+            local_hour,
+            local_weekday,
             play.listened_ms,
             play.duration_ms,
             play.completed as i64,

@@ -2,7 +2,7 @@ pub mod commands;
 mod repo;
 
 use anyhow::Result;
-use chrono::{DateTime, Duration, Local};
+use chrono::{DateTime, Datelike, Duration, Local, Timelike};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
@@ -123,7 +123,9 @@ fn bounds(range: StatsRange, month: Option<&str>) -> (String, String) {
     }
 }
 
-fn local_parts(started_at: &str) -> (String, String) {
+/// (date, month, hour, weekday)
+/// weekday counts from Sunday.
+fn local_parts(started_at: &str) -> (String, String, i64, i64) {
     let at = DateTime::parse_from_rfc3339(started_at)
         .map(|t| t.with_timezone(&Local))
         .unwrap_or_else(|e| {
@@ -134,12 +136,14 @@ fn local_parts(started_at: &str) -> (String, String) {
     (
         at.format("%Y-%m-%d").to_string(),
         at.format("%Y-%m").to_string(),
+        at.hour() as i64,
+        at.weekday().num_days_from_sunday() as i64,
     )
 }
 
 pub fn record(conn: &Connection, play: &PlayRecord) -> Result<()> {
-    let (date, month) = local_parts(&play.started_at);
-    repo::insert(conn, play, &date, &month)
+    let (date, month, hour, weekday) = local_parts(&play.started_at);
+    repo::insert(conn, play, &date, &month, hour, weekday)
 }
 
 pub fn overview(
