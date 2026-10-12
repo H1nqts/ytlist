@@ -12,6 +12,9 @@ const DATE_MAX: &str = "9999-99-99";
 
 const TOP_LIMIT: usize = 10;
 
+const PAGE_SIZE: usize = 50;
+const MAX_PAGE_SIZE: usize = 200;
+
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayRecord {
@@ -38,6 +41,63 @@ pub enum StatsRange {
     All,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RankingKind {
+    #[serde(rename = "tracks")]
+    Tracks,
+    #[serde(rename = "channels")]
+    Channels,
+    #[serde(rename = "playlists")]
+    Playlists,
+}
+
+#[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RankingSort {
+    #[serde(rename = "listenedMs")]
+    ListenedMs,
+    #[serde(rename = "playCount")]
+    PlayCount,
+    #[serde(rename = "completedCount")]
+    CompletedCount,
+    #[serde(rename = "lastPlayed")]
+    LastPlayed,
+    #[serde(rename = "name")]
+    Name,
+}
+
+impl RankingKind {
+    /// The final tiebreaker of the ranking order.
+    fn group_key(self) -> &'static str {
+        match self {
+            Self::Tracks => "video_id",
+            Self::Channels => "channel_key",
+            Self::Playlists => "playlist_id",
+        }
+    }
+
+    fn name_key(self) -> &'static str {
+        match self {
+            Self::Tracks => "title",
+            Self::Channels => "channel_name",
+            Self::Playlists => "name",
+        }
+    }
+}
+
+impl RankingSort {
+    fn order_by(self, kind: RankingKind) -> String {
+        let head = match self {
+            Self::ListenedMs => "listened_ms DESC, play_count DESC".to_string(),
+            Self::PlayCount => "play_count DESC, listened_ms DESC".to_string(),
+            Self::CompletedCount => "completed_count DESC, listened_ms DESC".to_string(),
+            Self::LastPlayed => "last_played_at DESC".to_string(),
+            Self::Name => format!("{} COLLATE NOCASE", kind.name_key()),
+        };
+
+        format!("{head}, {}", kind.group_key())
+    }
+}
+
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct StatsSummary {
@@ -59,6 +119,7 @@ pub struct TrackStat {
     pub play_count: i64,
     pub completed_count: i64,
     pub listened_ms: i64,
+    pub last_played_at: Option<String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -68,7 +129,9 @@ pub struct ChannelStat {
     pub channel_name: String,
     pub icon: Option<String>,
     pub play_count: i64,
+    pub completed_count: i64,
     pub listened_ms: i64,
+    pub last_played_at: Option<String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -86,7 +149,9 @@ pub struct PlaylistStat {
     pub name: String,
     pub present: bool,
     pub play_count: i64,
+    pub completed_count: i64,
     pub listened_ms: i64,
+    pub last_played_at: Option<String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -98,6 +163,18 @@ pub struct StatsOverview {
     pub daily: Vec<DailyStat>,
     pub playlists: Vec<PlaylistStat>,
     pub available_months: Vec<String>,
+}
+
+/// Only the list named by `kind` is filled.
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct StatsRanking {
+    pub kind: RankingKind,
+    pub tracks: Vec<TrackStat>,
+    pub channels: Vec<ChannelStat>,
+    pub playlists: Vec<PlaylistStat>,
+    pub total: i64,
+    pub offset: i64,
 }
 
 /// Inclusive `local_date` bounds for a range.
@@ -161,6 +238,43 @@ pub fn overview(
         playlists: repo::playlists(conn, &from, &to)?,
         available_months: repo::available_months(conn)?,
     })
+}
+
+pub fn ranking(
+    conn: &Connection,
+    range: StatsRange,
+    month: Option<&str>,
+    kind: RankingKind,
+    sort: RankingSort,
+    limit: Option<usize>,
+    offset: usize,
+) -> Result<StatsRanking> {
+    let (from, to) = bounds(range, month);
+    let limit = limit.unwrap_or(PAGE_SIZE).clamp(1, MAX_PAGE_SIZE);
+    let order_by = sort.order_by(kind);
+
+    let mut ranking = StatsRanking {
+        kind,
+        tracks: Vec::new(),
+        channels: Vec::new(),
+        playlists: Vec::new(),
+        total: repo::ranked_total(conn, &from, &to, kind)?,
+        offset: offset as i64,
+    };
+
+    match kind {
+        RankingKind::Tracks => {
+            ranking.tracks = repo::tracks_ranked(conn, &from, &to, &order_by, limit, offset)?
+        }
+        RankingKind::Channels => {
+            ranking.channels = repo::channels_ranked(conn, &from, &to, &order_by, limit, offset)?
+        }
+        RankingKind::Playlists => {
+            ranking.playlists = repo::playlists_ranked(conn, &from, &to, &order_by, limit, offset)?
+        }
+    }
+
+    Ok(ranking)
 }
 
 pub fn clear(conn: &Connection) -> Result<usize> {

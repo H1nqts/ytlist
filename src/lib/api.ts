@@ -160,6 +160,8 @@ export interface TrackStat {
   playCount: number
   completedCount: number
   listenedMs: number
+  /** RFC3339 */
+  lastPlayedAt: string | null
 }
 
 export interface ChannelStat {
@@ -167,7 +169,10 @@ export interface ChannelStat {
   channelName: string
   icon: string | null
   playCount: number
+  completedCount: number
   listenedMs: number
+  /** RFC3339 */
+  lastPlayedAt: string | null
 }
 
 export interface DailyStat {
@@ -182,7 +187,10 @@ export interface PlaylistStat {
   name: string
   present: boolean
   playCount: number
+  completedCount: number
   listenedMs: number
+  /** RFC3339 */
+  lastPlayedAt: string | null
 }
 
 export interface StatsOverview {
@@ -195,6 +203,25 @@ export interface StatsOverview {
   availableMonths: string[]
 }
 
+export type RankingKind = "tracks" | "channels" | "playlists"
+
+export type RankingSort =
+  | "listenedMs"
+  | "playCount"
+  | "completedCount"
+  | "lastPlayed"
+  | "name"
+
+/** Only the list named by `kind` is filled. */
+export interface StatsRanking {
+  kind: RankingKind
+  tracks: TrackStat[]
+  channels: ChannelStat[]
+  playlists: PlaylistStat[]
+  total: number
+  offset: number
+}
+
 export function statsRecord(record: PlayRecord): Promise<void> {
   return invoke<void>("stats_record", { record })
 }
@@ -204,6 +231,24 @@ export function statsOverview(
   month?: string
 ): Promise<StatsOverview> {
   return invoke<StatsOverview>("stats_overview", { range, month: month ?? null })
+}
+
+export function statsRanking(
+  range: StatsRange,
+  month: string | undefined,
+  kind: RankingKind,
+  sort: RankingSort,
+  limit?: number,
+  offset = 0
+): Promise<StatsRanking> {
+  return invoke<StatsRanking>("stats_ranking", {
+    range,
+    month: month ?? null,
+    kind,
+    sort,
+    limit: limit ?? null,
+    offset,
+  })
 }
 
 export function statsClear(): Promise<void> {

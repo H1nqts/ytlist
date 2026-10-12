@@ -1,6 +1,8 @@
 use tauri::State;
 
-use super::{PlayRecord, StatsOverview, StatsRange};
+use super::{
+    PlayRecord, RankingKind, RankingSort, StatsOverview, StatsRange, StatsRanking,
+};
 use crate::state::AppState;
 
 #[tauri::command]
@@ -20,6 +22,23 @@ pub fn stats_overview(
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     super::overview(&conn, range, month.as_deref())
         .inspect_err(|e| log::error!("failed to read play statistics: {e:#}"))
+        .map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub fn stats_ranking(
+    state: State<AppState>,
+    range: StatsRange,
+    month: Option<String>,
+    kind: RankingKind,
+    sort: RankingSort,
+    limit: Option<usize>,
+    offset: usize,
+) -> Result<StatsRanking, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    super::ranking(&conn, range, month.as_deref(), kind, sort, limit, offset)
+        .inspect_err(|e| log::error!("failed to read a statistics ranking: {e:#}"))
         .map_err(|e| format!("{e:#}"))
 }
 

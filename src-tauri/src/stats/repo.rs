@@ -1,10 +1,16 @@
 use anyhow::Result;
 use rusqlite::{params, Connection, Row};
 
-use super::{ChannelStat, DailyStat, PlayRecord, PlaylistStat, StatsSummary, TrackStat};
+use super::{
+    ChannelStat, DailyStat, PlayRecord, PlaylistStat, RankingKind, StatsSummary, TrackStat,
+};
 
 /// Videos scraped without a channel id carry an empty string, not NULL.
 const CHANNEL_KEY: &str = "COALESCE(NULLIF(h.channel_id, ''), h.channel_name)";
+
+pub const NO_PLAYLIST_NAME: &str = "Outside a playlist";
+
+const DEFAULT_ORDER: &str = "listened_ms DESC, play_count DESC";
 
 fn row_to_track(row: &Row) -> rusqlite::Result<TrackStat> {
     Ok(TrackStat {
@@ -15,6 +21,7 @@ fn row_to_track(row: &Row) -> rusqlite::Result<TrackStat> {
         play_count: row.get("play_count")?,
         completed_count: row.get("completed_count")?,
         listened_ms: row.get("listened_ms")?,
+        last_played_at: row.get("last_played_at")?,
     })
 }
 
@@ -24,7 +31,9 @@ fn row_to_channel(row: &Row) -> rusqlite::Result<ChannelStat> {
         channel_name: row.get("channel_name")?,
         icon: row.get("icon")?,
         play_count: row.get("play_count")?,
+        completed_count: row.get("completed_count")?,
         listened_ms: row.get("listened_ms")?,
+        last_played_at: row.get("last_played_at")?,
     })
 }
 
@@ -42,7 +51,9 @@ fn row_to_playlist(row: &Row) -> rusqlite::Result<PlaylistStat> {
         name: row.get("name")?,
         present: row.get::<_, i64>("present")? != 0,
         play_count: row.get("play_count")?,
+        completed_count: row.get("completed_count")?,
         listened_ms: row.get("listened_ms")?,
+        last_played_at: row.get("last_played_at")?,
     })
 }
 
@@ -119,27 +130,7 @@ pub fn top_tracks(
     to: &str,
     limit: usize,
 ) -> Result<Vec<TrackStat>> {
-    // Not by play_count: a track skipped after a few seconds would outrank one
-    // that was played through.
-    let mut stmt = conn.prepare(
-        "SELECT h.video_id AS video_id,
-                COALESCE(v.title, MAX(h.title)) AS title,
-                COALESCE(c.name, MAX(h.channel_name)) AS channel_name,
-                v.thumbnail AS thumbnail,
-                COUNT(*) AS play_count,
-                SUM(h.completed) AS completed_count,
-                SUM(h.listened_ms) AS listened_ms
-         FROM play_history h
-         LEFT JOIN videos v ON v.id = h.video_id
-         LEFT JOIN channels c ON c.id = v.channel_id
-         WHERE h.local_date BETWEEN ?1 AND ?2
-         GROUP BY h.video_id
-         ORDER BY listened_ms DESC, play_count DESC
-         LIMIT ?3",
-    )?;
-    let rows = stmt.query_map(params![from, to, limit as i64], row_to_track)?;
-
-    Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    tracks_ranked(conn, from, to, DEFAULT_ORDER, limit, 0)
 }
 
 pub fn top_channels(
@@ -148,20 +139,72 @@ pub fn top_channels(
     to: &str,
     limit: usize,
 ) -> Result<Vec<ChannelStat>> {
+    channels_ranked(conn, from, to, DEFAULT_ORDER, limit, 0)
+}
+
+pub fn tracks_ranked(
+    conn: &Connection,
+    from: &str,
+    to: &str,
+    order_by: &str,
+    limit: usize,
+    offset: usize,
+) -> Result<Vec<TrackStat>> {
+    // Not by play_count: a track skipped after a few seconds would outrank one
+    // that was played through.
+    let mut stmt = conn.prepare(&format!(
+        "SELECT h.video_id AS video_id,
+                COALESCE(v.title, MAX(h.title)) AS title,
+                COALESCE(c.name, MAX(h.channel_name)) AS channel_name,
+                v.thumbnail AS thumbnail,
+                COUNT(*) AS play_count,
+                SUM(h.completed) AS completed_count,
+                SUM(h.listened_ms) AS listened_ms,
+                MAX(h.started_at) AS last_played_at
+         FROM play_history h
+         LEFT JOIN videos v ON v.id = h.video_id
+         LEFT JOIN channels c ON c.id = v.channel_id
+         WHERE h.local_date BETWEEN ?1 AND ?2
+         GROUP BY h.video_id
+         ORDER BY {order_by}
+         LIMIT ?3 OFFSET ?4"
+    ))?;
+    let rows = stmt.query_map(
+        params![from, to, limit as i64, offset as i64],
+        row_to_track,
+    )?;
+
+    Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
+pub fn channels_ranked(
+    conn: &Connection,
+    from: &str,
+    to: &str,
+    order_by: &str,
+    limit: usize,
+    offset: usize,
+) -> Result<Vec<ChannelStat>> {
     let mut stmt = conn.prepare(&format!(
         "SELECT NULLIF(h.channel_id, '') AS channel_id,
+                {CHANNEL_KEY} AS channel_key,
                 COALESCE(MAX(c.name), MAX(h.channel_name)) AS channel_name,
                 MAX(c.icon) AS icon,
                 COUNT(*) AS play_count,
-                SUM(h.listened_ms) AS listened_ms
+                SUM(h.completed) AS completed_count,
+                SUM(h.listened_ms) AS listened_ms,
+                MAX(h.started_at) AS last_played_at
          FROM play_history h
          LEFT JOIN channels c ON c.id = NULLIF(h.channel_id, '')
          WHERE h.local_date BETWEEN ?1 AND ?2
          GROUP BY {CHANNEL_KEY}
-         ORDER BY listened_ms DESC, play_count DESC
-         LIMIT ?3"
+         ORDER BY {order_by}
+         LIMIT ?3 OFFSET ?4"
     ))?;
-    let rows = stmt.query_map(params![from, to, limit as i64], row_to_channel)?;
+    let rows = stmt.query_map(
+        params![from, to, limit as i64, offset as i64],
+        row_to_channel,
+    )?;
 
     Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
 }
@@ -182,22 +225,74 @@ pub fn daily(conn: &Connection, from: &str, to: &str) -> Result<Vec<DailyStat>> 
 }
 
 pub fn playlists(conn: &Connection, from: &str, to: &str) -> Result<Vec<PlaylistStat>> {
-    // Plays made outside a playlist share the NULL group.
-    let mut stmt = conn.prepare(
-        "SELECT h.playlist_id AS playlist_id,
-                COALESCE(MAX(p.name), MAX(h.playlist_name), 'Outside a playlist') AS name,
-                MAX(p.id IS NOT NULL) AS present,
-                COUNT(*) AS play_count,
-                SUM(h.listened_ms) AS listened_ms
-         FROM play_history h
-         LEFT JOIN playlists p ON p.id = h.playlist_id
-         WHERE h.local_date BETWEEN ?1 AND ?2
-         GROUP BY h.playlist_id
+    let mut stmt = conn.prepare(&format!(
+        "{}
          ORDER BY listened_ms DESC",
-    )?;
+        playlists_select()
+    ))?;
     let rows = stmt.query_map(params![from, to], row_to_playlist)?;
 
     Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
+pub fn playlists_ranked(
+    conn: &Connection,
+    from: &str,
+    to: &str,
+    order_by: &str,
+    limit: usize,
+    offset: usize,
+) -> Result<Vec<PlaylistStat>> {
+    let mut stmt = conn.prepare(&format!(
+        "{}
+         ORDER BY {order_by}
+         LIMIT ?3 OFFSET ?4",
+        playlists_select()
+    ))?;
+    let rows = stmt.query_map(
+        params![from, to, limit as i64, offset as i64],
+        row_to_playlist,
+    )?;
+
+    Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
+fn playlists_select() -> String {
+    format!(
+        "SELECT h.playlist_id AS playlist_id,
+                COALESCE(MAX(p.name), MAX(h.playlist_name), '{NO_PLAYLIST_NAME}') AS name,
+                MAX(p.id IS NOT NULL) AS present,
+                COUNT(*) AS play_count,
+                SUM(h.completed) AS completed_count,
+                SUM(h.listened_ms) AS listened_ms,
+                MAX(h.started_at) AS last_played_at
+         FROM play_history h
+         LEFT JOIN playlists p ON p.id = h.playlist_id
+         WHERE h.local_date BETWEEN ?1 AND ?2
+         GROUP BY h.playlist_id"
+    )
+}
+
+pub fn ranked_total(conn: &Connection, from: &str, to: &str, kind: RankingKind) -> Result<i64> {
+    let group = match kind {
+        RankingKind::Tracks => "h.video_id".to_string(),
+        RankingKind::Channels => CHANNEL_KEY.to_string(),
+        RankingKind::Playlists => "h.playlist_id".to_string(),
+    };
+
+    let total = conn.query_row(
+        &format!(
+            "SELECT COUNT(*) FROM (
+                SELECT 1 FROM play_history h
+                WHERE h.local_date BETWEEN ?1 AND ?2
+                GROUP BY {group}
+             )"
+        ),
+        params![from, to],
+        |row| row.get(0),
+    )?;
+
+    Ok(total)
 }
 
 pub fn available_months(conn: &Connection) -> Result<Vec<String>> {

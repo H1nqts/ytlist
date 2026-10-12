@@ -15,6 +15,7 @@ pub const COMMAND_HANDLERS: fn(tauri::ipc::Invoke) -> bool = tauri::generate_han
     playback::commands::playback_set,
     stats::commands::stats_record,
     stats::commands::stats_overview,
+    stats::commands::stats_ranking,
     stats::commands::stats_clear,
     ytdlp::commands::ytdlp_status,
     ytdlp::commands::ytdlp_retry,
