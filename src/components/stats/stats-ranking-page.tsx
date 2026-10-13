@@ -3,7 +3,7 @@ import { ChartColumnIcon } from "lucide-react"
 
 import type { RankingKind, RankingSort, StatsRange } from "@/lib/api"
 import { statsRanking } from "@/lib/api"
-import { formatRelative, formatTotalDuration } from "@/lib/format"
+import { formatExactDuration, formatRelative } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -55,7 +55,7 @@ function plays(count: number): string {
 }
 
 function listened(ms: number): string {
-  return formatTotalDuration(Math.round(ms / 1000))
+  return formatExactDuration(Math.round(ms / 1000))
 }
 
 function lastPlayed(at: string | null): string {
@@ -64,28 +64,45 @@ function lastPlayed(at: string | null): string {
 
 interface StatsRankingPageProps {
   of: RankingKind
+  sort: RankingSort
+  offset: number
   range: StatsRange
   month: string | null
   reloads: number
   onLoadingChange: (loading: boolean) => void
+  /** Reports the sort and page back to the view stack, which holds them. */
+  onBrowse: (sort: RankingSort, offset: number) => void
   onOpen: (sub: StatsSubView) => void
 }
 
 export function StatsRankingPage({
   of,
+  sort,
+  offset,
   range,
   month,
   reloads,
   onLoadingChange,
+  onBrowse,
   onOpen,
 }: StatsRankingPageProps) {
   const { statsCleared } = useSettings()
-  const [sort, setSort] = React.useState<RankingSort>("listenedMs")
-  const [offset, setOffset] = React.useState(0)
+
+  const setSort = React.useCallback(
+    (next: RankingSort) => onBrowse(next, 0),
+    [onBrowse]
+  )
+  const setOffset = React.useCallback(
+    (next: number) => onBrowse(sort, next),
+    [onBrowse, sort]
+  )
+
+  const resetPage = React.useRef<() => void>(() => {})
+  resetPage.current = () => setOffset(0)
 
   React.useEffect(() => {
-    setOffset(0)
-  }, [of, sort, range, month, statsCleared])
+    resetPage.current()
+  }, [range, month, statsCleared])
 
   const { data, loading, failed } = useStatsQuery(
     () => statsRanking(range, month ?? undefined, of, sort, PAGE_SIZE, offset),

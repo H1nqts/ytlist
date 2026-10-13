@@ -21,6 +21,17 @@ export function formatTotalDuration(totalSec: number): string {
   return `${sec} sec`
 }
 
+/** 5040 -> "1 hr 24 min 0 sec", 225 -> "3 min 45 sec", 45 -> "45 sec" */
+export function formatExactDuration(totalSec: number): string {
+  const sec = Math.max(0, Math.floor(totalSec))
+  const h = Math.floor(sec / 3600)
+  const m = Math.floor((sec % 3600) / 60)
+  const s = sec % 60
+  if (h > 0) return `${h} hr ${m} min ${s} sec`
+  if (m > 0) return `${m} min ${s} sec`
+  return `${s} sec`
+}
+
 /** 1200000 -> "1.2M views", 853000 -> "853K views", 1100000000 -> "1.1B views" */
 export function formatViews(n: number): string {
   return `${formatCount(n)} views`
@@ -53,6 +64,17 @@ export function formatMonth(month: string): string {
   return new Date(y, m - 1, 1).toLocaleDateString("en-US", {
     month: "long",
     year: "numeric",
+  })
+}
+
+/** ISO timestamp -> "Sep 15, 2026, 9:04 PM" */
+export function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   })
 }
 

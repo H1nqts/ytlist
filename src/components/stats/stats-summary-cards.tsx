@@ -1,21 +1,27 @@
 import type { StatsSummary } from "@/lib/api"
-import { formatTotalDuration } from "@/lib/format"
+import { formatExactDuration, formatTotalDuration } from "@/lib/format"
 import { Card } from "@/components/ui/card"
 
 interface StatsSummaryCardsProps {
   summary: StatsSummary
+  /** Keeps the seconds in the listening time. */
+  exact?: boolean
 }
 
-export function StatsSummaryCards({ summary }: StatsSummaryCardsProps) {
+export function StatsSummaryCards({ summary, exact }: StatsSummaryCardsProps) {
   const completion =
     summary.playCount === 0
       ? "—"
       : `${Math.round((summary.completedCount / summary.playCount) * 100)}%`
 
+  const seconds = Math.round(summary.listenedMs / 1000)
+
   const tiles = [
     {
       label: "Listening time",
-      value: formatTotalDuration(Math.round(summary.listenedMs / 1000)),
+      value: exact
+        ? formatExactDuration(seconds)
+        : formatTotalDuration(seconds),
       hint: `across ${summary.activeDays} ${summary.activeDays === 1 ? "day" : "days"}`,
     },
     {

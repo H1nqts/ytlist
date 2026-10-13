@@ -15,7 +15,7 @@ import { StatsDailyChart } from "@/components/stats/stats-daily-chart"
 import { StatsTopList, type TopEntry } from "@/components/stats/stats-top-list"
 import { StatsPlaylists } from "@/components/stats/stats-playlists"
 import { useStatsQuery } from "@/components/stats/use-stats-query"
-import type { StatsSubView } from "@/components/stats/stats-sub-view"
+import { ranking, type StatsSubView } from "@/components/stats/stats-sub-view"
 
 function plays(count: number): string {
   return `${count.toLocaleString()} ${count === 1 ? "play" : "plays"}`
@@ -74,6 +74,16 @@ export function StatsOverviewPage({
         ),
       })),
     [data]
+  )
+
+  const onSelectTrack = React.useCallback(
+    (videoId: string) => {
+      const track = data?.topTracks.find((t) => t.videoId === videoId)
+      if (track) {
+        onOpen({ kind: "track", videoId: track.videoId, title: track.title })
+      }
+    },
+    [data, onOpen]
   )
 
   const channelEntries = React.useMemo<TopEntry[]>(
@@ -151,19 +161,20 @@ export function StatsOverviewPage({
           heading="Top tracks"
           entries={trackEntries}
           emptyLabel="Nothing yet."
-          onSeeAll={() => onOpen({ kind: "ranking", of: "tracks" })}
+          onSeeAll={() => onOpen(ranking("tracks"))}
+          onSelect={onSelectTrack}
         />
         <StatsTopList
           heading="Top channels"
           entries={channelEntries}
           emptyLabel="Nothing yet."
-          onSeeAll={() => onOpen({ kind: "ranking", of: "channels" })}
+          onSeeAll={() => onOpen(ranking("channels"))}
         />
       </div>
 
       <StatsPlaylists
         playlists={data.playlists}
-        onSeeAll={() => onOpen({ kind: "ranking", of: "playlists" })}
+        onSeeAll={() => onOpen(ranking("playlists"))}
       />
     </div>
   )

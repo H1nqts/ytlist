@@ -1,7 +1,11 @@
 import * as React from "react"
 
 import type { DailyStat, StatsRange } from "@/lib/api"
-import { formatShortDate, formatTotalDuration } from "@/lib/format"
+import {
+  formatExactDuration,
+  formatShortDate,
+  formatTotalDuration,
+} from "@/lib/format"
 
 interface Bar {
   date: string
@@ -75,7 +79,7 @@ export function StatsDailyChart({ daily, range }: StatsDailyChartProps) {
           {bars.map((bar) => (
             <div
               key={bar.date}
-              title={`${formatShortDate(bar.date)} · ${formatTotalDuration(
+              title={`${formatShortDate(bar.date)} · ${formatExactDuration(
                 Math.round(bar.listenedMs / 1000)
               )} · ${bar.playCount} ${bar.playCount === 1 ? "play" : "plays"}`}
               style={{

@@ -511,7 +511,7 @@ fn track_identity(conn: &Connection, video_id: &str) -> Result<DetailIdentity> {
                     })?,
                     image: row.get("thumbnail")?,
                     present: true,
-                    duration_ms: row.get::<_, i64>("duration").map(|sec| Some(sec * 1000))?,
+                    duration_ms: row.get("duration")?,
                 })
             },
         )

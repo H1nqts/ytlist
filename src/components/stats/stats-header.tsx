@@ -13,6 +13,7 @@ import { subViewTitle, type StatsSubView } from "@/components/stats/stats-sub-vi
 
 interface StatsHeaderProps {
   sub: StatsSubView
+  parent: StatsSubView | null
   range: StatsRange
   month: string | null
   availableMonths: string[]
@@ -24,6 +25,7 @@ interface StatsHeaderProps {
 
 export function StatsHeader({
   sub,
+  parent,
   range,
   month,
   availableMonths,
@@ -32,24 +34,26 @@ export function StatsHeader({
   onBack,
   onRefresh,
 }: StatsHeaderProps) {
-  const nested = sub.kind !== "overview"
+  const parentTitle = parent && subViewTitle(parent)
 
   return (
     <header className="flex flex-wrap items-center justify-between gap-3 px-6 pt-6 pb-3">
       <div className="flex min-w-0 items-center gap-2">
-        {nested && (
+        {parentTitle && (
           <Button
             size="icon-sm"
             variant="ghost"
             onClick={onBack}
-            aria-label="Back to statistics"
+            aria-label={`Back to ${parentTitle}`}
           >
             <ArrowLeftIcon />
           </Button>
         )}
         <div className="min-w-0">
-          {nested && (
-            <p className="text-[11px] text-muted-foreground">Statistics</p>
+          {parentTitle && (
+            <p className="truncate text-[11px] text-muted-foreground">
+              {parentTitle}
+            </p>
           )}
           <h1 className="truncate font-heading text-2xl font-semibold">
             {subViewTitle(sub)}
