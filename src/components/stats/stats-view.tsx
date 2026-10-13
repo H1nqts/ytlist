@@ -5,6 +5,7 @@ import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { StatsHeader } from "@/components/stats/stats-header"
 import { StatsOverviewPage } from "@/components/stats/stats-overview-page"
+import { StatsRankingPage } from "@/components/stats/stats-ranking-page"
 import type { StatsSubView } from "@/components/stats/stats-sub-view"
 
 const DEFAULT_RANGE: StatsRange = "last30Days"
@@ -71,14 +72,25 @@ export function StatsView() {
       <Separator />
 
       <ScrollArea className="min-h-0 flex-1">
-        <StatsOverviewPage
-          range={range}
-          month={month}
-          reloads={reloads}
-          onMonths={onMonths}
-          onLoadingChange={setLoading}
-          onOpen={setSub}
-        />
+        {sub.kind === "ranking" ? (
+          <StatsRankingPage
+            of={sub.of}
+            range={range}
+            month={month}
+            reloads={reloads}
+            onLoadingChange={setLoading}
+            onOpen={setSub}
+          />
+        ) : (
+          <StatsOverviewPage
+            range={range}
+            month={month}
+            reloads={reloads}
+            onMonths={onMonths}
+            onLoadingChange={setLoading}
+            onOpen={setSub}
+          />
+        )}
       </ScrollArea>
     </div>
   )

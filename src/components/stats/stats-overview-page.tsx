@@ -36,6 +36,7 @@ export function StatsOverviewPage({
   reloads,
   onMonths,
   onLoadingChange,
+  onOpen,
 }: StatsOverviewPageProps) {
   const { statsEnabled, statsCleared } = useSettings()
 
@@ -150,15 +151,20 @@ export function StatsOverviewPage({
           heading="Top tracks"
           entries={trackEntries}
           emptyLabel="Nothing yet."
+          onSeeAll={() => onOpen({ kind: "ranking", of: "tracks" })}
         />
         <StatsTopList
           heading="Top channels"
           entries={channelEntries}
           emptyLabel="Nothing yet."
+          onSeeAll={() => onOpen({ kind: "ranking", of: "channels" })}
         />
       </div>
 
-      <StatsPlaylists playlists={data.playlists} />
+      <StatsPlaylists
+        playlists={data.playlists}
+        onSeeAll={() => onOpen({ kind: "ranking", of: "playlists" })}
+      />
     </div>
   )
 }

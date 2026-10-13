@@ -1,25 +1,59 @@
 import type { PlaylistStat } from "@/lib/api"
 import { formatTotalDuration } from "@/lib/format"
+import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 
 interface StatsPlaylistsProps {
   playlists: PlaylistStat[]
+  onSeeAll?: () => void
+  onSelect?: (playlistId: number | null) => void
 }
 
-export function StatsPlaylists({ playlists }: StatsPlaylistsProps) {
+export function StatsPlaylists({
+  playlists,
+  onSeeAll,
+  onSelect,
+}: StatsPlaylistsProps) {
   if (playlists.length === 0) return null
 
   const peak = Math.max(1, ...playlists.map((p) => p.listenedMs))
 
   return (
     <section className="space-y-2">
-      <h2 className="text-sm font-medium text-foreground">By playlist</h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-medium text-foreground">By playlist</h2>
+        {onSeeAll && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onSeeAll}
+            className="h-6 px-2 text-[11px] text-muted-foreground"
+          >
+            See all
+          </Button>
+        )}
+      </div>
 
       <ul className="space-y-1">
         {playlists.map((playlist) => (
           <li
             key={playlist.playlistId ?? "none"}
-            className="relative flex items-center gap-2 overflow-hidden rounded-md px-2 py-1.5"
+            className={cn(
+              "relative flex items-center gap-2 overflow-hidden rounded-md px-2 py-1.5",
+              onSelect && "cursor-pointer hover:bg-accent/50"
+            )}
+            {...(onSelect && {
+              role: "button",
+              tabIndex: 0,
+              onClick: () => onSelect(playlist.playlistId),
+              onKeyDown: (e: React.KeyboardEvent) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  onSelect(playlist.playlistId)
+                }
+              },
+            })}
           >
             <div
               aria-hidden
