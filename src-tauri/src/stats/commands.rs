@@ -1,8 +1,8 @@
 use tauri::State;
 
 use super::{
-    DetailTarget, PlayRecord, RankingKind, RankingSort, StatsDetail, StatsOverview, StatsRange,
-    StatsRanking,
+    DetailTarget, PlayRecord, RankingKind, RankingSort, StatsDetail, StatsOverview, StatsPatterns,
+    StatsRange, StatsRanking,
 };
 use crate::state::AppState;
 
@@ -53,6 +53,18 @@ pub fn stats_detail(
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     super::detail(&conn, range, month.as_deref(), &target)
         .inspect_err(|e| log::error!("failed to read item statistics: {e:#}"))
+        .map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub fn stats_patterns(
+    state: State<AppState>,
+    range: StatsRange,
+    month: Option<String>,
+) -> Result<StatsPatterns, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    super::patterns(&conn, range, month.as_deref())
+        .inspect_err(|e| log::error!("failed to read listening patterns: {e:#}"))
         .map_err(|e| format!("{e:#}"))
 }
 

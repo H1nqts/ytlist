@@ -222,6 +222,26 @@ export interface StatsRanking {
   offset: number
 }
 
+export interface HourStat {
+  hour: number
+  playCount: number
+  listenedMs: number
+}
+
+export interface WeekdayStat {
+  /** 0 is Sunday. */
+  weekday: number
+  playCount: number
+  listenedMs: number
+}
+
+/** Hours and weekdays with no play are absent. */
+export interface StatsPatterns {
+  hours: HourStat[]
+  weekdays: WeekdayStat[]
+  summary: StatsSummary
+}
+
 export type DetailTarget =
   | { kind: "track"; videoId: string }
   | { kind: "channel"; channelId: string | null }
@@ -280,6 +300,16 @@ export function statsDetail(
     range,
     month: month ?? null,
     target,
+  })
+}
+
+export function statsPatterns(
+  range: StatsRange,
+  month?: string
+): Promise<StatsPatterns> {
+  return invoke<StatsPatterns>("stats_patterns", {
+    range,
+    month: month ?? null,
   })
 }
 

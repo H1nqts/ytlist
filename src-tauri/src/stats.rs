@@ -165,6 +165,32 @@ pub struct StatsOverview {
     pub available_months: Vec<String>,
 }
 
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct HourStat {
+    pub hour: i64,
+    pub play_count: i64,
+    pub listened_ms: i64,
+}
+
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct WeekdayStat {
+    /// 0 is Sunday.
+    pub weekday: i64,
+    pub play_count: i64,
+    pub listened_ms: i64,
+}
+
+/// Hours and weekdays with no play are absent.
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct StatsPatterns {
+    pub hours: Vec<HourStat>,
+    pub weekdays: Vec<WeekdayStat>,
+    pub summary: StatsSummary,
+}
+
 #[derive(Deserialize, Debug, Clone)]
 #[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum DetailTarget {
@@ -268,6 +294,20 @@ pub fn overview(
         daily: repo::daily(conn, &from, &to)?,
         playlists: repo::playlists(conn, &from, &to)?,
         available_months: repo::available_months(conn)?,
+    })
+}
+
+pub fn patterns(
+    conn: &Connection,
+    range: StatsRange,
+    month: Option<&str>,
+) -> Result<StatsPatterns> {
+    let (from, to) = bounds(range, month);
+
+    Ok(StatsPatterns {
+        hours: repo::hours(conn, &from, &to)?,
+        weekdays: repo::weekdays(conn, &from, &to)?,
+        summary: repo::summary(conn, &from, &to)?,
     })
 }
 

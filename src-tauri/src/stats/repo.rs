@@ -2,8 +2,8 @@ use anyhow::Result;
 use rusqlite::{params, params_from_iter, Connection, OptionalExtension, Row, ToSql};
 
 use super::{
-    ChannelStat, DailyStat, DetailTarget, PlayRecord, PlaylistStat, RankingKind, StatsSummary,
-    TrackStat,
+    ChannelStat, DailyStat, DetailTarget, HourStat, PlayRecord, PlaylistStat, RankingKind,
+    StatsSummary, TrackStat, WeekdayStat,
 };
 
 /// Plays of a video missing from `videos` share the NULL group.
@@ -212,6 +212,48 @@ pub fn channels_ranked(
         params![from, to, limit as i64, offset as i64],
         row_to_channel,
     )?;
+
+    Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
+pub fn hours(conn: &Connection, from: &str, to: &str) -> Result<Vec<HourStat>> {
+    let mut stmt = conn.prepare(
+        "SELECT h.local_hour AS hour,
+                COUNT(*) AS play_count,
+                SUM(h.listened_ms) AS listened_ms
+         FROM play_history h
+         WHERE h.local_date BETWEEN ?1 AND ?2 AND h.local_hour IS NOT NULL
+         GROUP BY h.local_hour
+         ORDER BY h.local_hour",
+    )?;
+    let rows = stmt.query_map(params![from, to], |row| {
+        Ok(HourStat {
+            hour: row.get("hour")?,
+            play_count: row.get("play_count")?,
+            listened_ms: row.get("listened_ms")?,
+        })
+    })?;
+
+    Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
+pub fn weekdays(conn: &Connection, from: &str, to: &str) -> Result<Vec<WeekdayStat>> {
+    let mut stmt = conn.prepare(
+        "SELECT h.local_weekday AS weekday,
+                COUNT(*) AS play_count,
+                SUM(h.listened_ms) AS listened_ms
+         FROM play_history h
+         WHERE h.local_date BETWEEN ?1 AND ?2 AND h.local_weekday IS NOT NULL
+         GROUP BY h.local_weekday
+         ORDER BY h.local_weekday",
+    )?;
+    let rows = stmt.query_map(params![from, to], |row| {
+        Ok(WeekdayStat {
+            weekday: row.get("weekday")?,
+            play_count: row.get("play_count")?,
+            listened_ms: row.get("listened_ms")?,
+        })
+    })?;
 
     Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
 }
