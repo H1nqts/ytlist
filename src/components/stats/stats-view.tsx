@@ -109,7 +109,9 @@ export function StatsView() {
             onBrowse={onBrowse}
             onOpen={onOpen}
           />
-        ) : sub.kind === "track" ? (
+        ) : sub.kind === "track" ||
+          sub.kind === "channel" ||
+          sub.kind === "playlist" ? (
           <StatsDetailPage
             sub={sub}
             range={range}

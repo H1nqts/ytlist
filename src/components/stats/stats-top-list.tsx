@@ -15,7 +15,7 @@ interface StatsTopListProps {
   entries: TopEntry[]
   emptyLabel: string
   onSeeAll?: () => void
-  onSelect?: (key: string) => void
+  onSelect?: (index: number) => void
 }
 
 export function StatsTopList({
@@ -69,11 +69,11 @@ export function StatsTopList({
                 {...(onSelect && {
                   role: "button",
                   tabIndex: 0,
-                  onClick: () => onSelect(entry.key),
+                  onClick: () => onSelect(i),
                   onKeyDown: (e: React.KeyboardEvent) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault()
-                      onSelect(entry.key)
+                      onSelect(i)
                     }
                   },
                 })}

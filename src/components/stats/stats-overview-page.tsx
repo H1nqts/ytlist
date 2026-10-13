@@ -77,10 +77,38 @@ export function StatsOverviewPage({
   )
 
   const onSelectTrack = React.useCallback(
-    (videoId: string) => {
-      const track = data?.topTracks.find((t) => t.videoId === videoId)
+    (index: number) => {
+      const track = data?.topTracks[index]
       if (track) {
         onOpen({ kind: "track", videoId: track.videoId, title: track.title })
+      }
+    },
+    [data, onOpen]
+  )
+
+  const onSelectChannel = React.useCallback(
+    (index: number) => {
+      const channel = data?.topChannels[index]
+      if (channel) {
+        onOpen({
+          kind: "channel",
+          channelId: channel.channelId,
+          channelName: channel.channelName,
+        })
+      }
+    },
+    [data, onOpen]
+  )
+
+  const onSelectPlaylist = React.useCallback(
+    (playlistId: number | null) => {
+      const playlist = data?.playlists.find((p) => p.playlistId === playlistId)
+      if (playlist) {
+        onOpen({
+          kind: "playlist",
+          playlistId: playlist.playlistId,
+          name: playlist.name,
+        })
       }
     },
     [data, onOpen]
@@ -169,12 +197,14 @@ export function StatsOverviewPage({
           entries={channelEntries}
           emptyLabel="Nothing yet."
           onSeeAll={() => onOpen(ranking("channels"))}
+          onSelect={onSelectChannel}
         />
       </div>
 
       <StatsPlaylists
         playlists={data.playlists}
         onSeeAll={() => onOpen(ranking("playlists"))}
+        onSelect={onSelectPlaylist}
       />
     </div>
   )

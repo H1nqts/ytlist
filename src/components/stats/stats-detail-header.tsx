@@ -1,5 +1,6 @@
 import type { StatsDetail } from "@/lib/api"
 import { formatDateTime, formatDuration, formatRelative } from "@/lib/format"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Thumbnail } from "@/components/ui/thumbnail"
 import { MarqueeText } from "@/components/ui/marquee-text"
@@ -28,7 +29,16 @@ export function StatsDetailHeader({ kind, detail }: StatsDetailHeaderProps) {
 
   return (
     <section className="flex items-center gap-4">
-      {kind === "track" && (
+      {kind === "channel" ? (
+        <Avatar size="lg" className="size-16">
+          {detail.image && (
+            <AvatarImage src={detail.image} alt={detail.title} />
+          )}
+          <AvatarFallback className="text-xl">
+            {detail.title.slice(0, 1).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+      ) : (
         <Thumbnail
           src={detail.image ?? undefined}
           alt={detail.title}

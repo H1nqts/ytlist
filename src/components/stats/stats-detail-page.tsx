@@ -75,8 +75,8 @@ export function StatsDetailPage({
   )
 
   const onSelectTrack = React.useCallback(
-    (videoId: string) => {
-      const track = data?.topTracks.find((t) => t.videoId === videoId)
+    (index: number) => {
+      const track = data?.topTracks[index]
       if (track) {
         onOpen({ kind: "track", videoId: track.videoId, title: track.title })
       }
