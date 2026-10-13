@@ -1,14 +1,20 @@
 use anyhow::Result;
-use rusqlite::{params, Connection, Row};
+use rusqlite::{params, params_from_iter, Connection, OptionalExtension, Row, ToSql};
 
 use super::{
-    ChannelStat, DailyStat, PlayRecord, PlaylistStat, RankingKind, StatsSummary, TrackStat,
+    ChannelStat, DailyStat, DetailTarget, PlayRecord, PlaylistStat, RankingKind, StatsSummary,
+    TrackStat,
 };
 
-/// Videos scraped without a channel id carry an empty string, not NULL.
-const CHANNEL_KEY: &str = "COALESCE(NULLIF(h.channel_id, ''), h.channel_name)";
+/// Plays of a video missing from `videos` share the NULL group.
+const CHANNEL_KEY: &str = "h.channel_id";
+
+/// `COUNT(DISTINCT)` skips NULL, so the NULL group needs a stand-in to be counted.
+const CHANNEL_COUNT_KEY: &str = "COALESCE(h.channel_id, '')";
 
 pub const NO_PLAYLIST_NAME: &str = "Outside a playlist";
+
+pub const NO_CHANNEL_NAME: &str = "Unknown channel";
 
 const DEFAULT_ORDER: &str = "listened_ms DESC, play_count DESC";
 
@@ -103,7 +109,7 @@ pub fn summary(conn: &Connection, from: &str, to: &str) -> Result<StatsSummary> 
                     COALESCE(SUM(h.completed), 0) AS completed_count,
                     COALESCE(SUM(h.listened_ms), 0) AS listened_ms,
                     COUNT(DISTINCT h.video_id) AS unique_tracks,
-                    COUNT(DISTINCT {CHANNEL_KEY}) AS unique_channels,
+                    COUNT(DISTINCT {CHANNEL_COUNT_KEY}) AS unique_channels,
                     COUNT(DISTINCT h.local_date) AS active_days
              FROM play_history h
              WHERE h.local_date BETWEEN ?1 AND ?2"
@@ -186,18 +192,19 @@ pub fn channels_ranked(
     offset: usize,
 ) -> Result<Vec<ChannelStat>> {
     let mut stmt = conn.prepare(&format!(
-        "SELECT NULLIF(h.channel_id, '') AS channel_id,
-                {CHANNEL_KEY} AS channel_key,
-                COALESCE(MAX(c.name), MAX(h.channel_name)) AS channel_name,
+        "SELECT h.channel_id AS channel_id,
+                h.channel_id AS channel_key,
+                CASE WHEN h.channel_id IS NULL THEN '{NO_CHANNEL_NAME}'
+                     ELSE COALESCE(MAX(c.name), MAX(h.channel_name)) END AS channel_name,
                 MAX(c.icon) AS icon,
                 COUNT(*) AS play_count,
                 SUM(h.completed) AS completed_count,
                 SUM(h.listened_ms) AS listened_ms,
                 MAX(h.started_at) AS last_played_at
          FROM play_history h
-         LEFT JOIN channels c ON c.id = NULLIF(h.channel_id, '')
+         LEFT JOIN channels c ON c.id = h.channel_id
          WHERE h.local_date BETWEEN ?1 AND ?2
-         GROUP BY {CHANNEL_KEY}
+         GROUP BY h.channel_id
          ORDER BY {order_by}
          LIMIT ?3 OFFSET ?4"
     ))?;
@@ -271,6 +278,338 @@ fn playlists_select() -> String {
          WHERE h.local_date BETWEEN ?1 AND ?2
          GROUP BY h.playlist_id"
     )
+}
+
+pub struct DetailIdentity {
+    pub title: String,
+    pub subtitle: Option<String>,
+    pub image: Option<String>,
+    pub present: bool,
+    pub duration_ms: Option<i64>,
+}
+
+/// A `WHERE` fragment starting at `?3`, with the values to bind after `from` and `to`.
+fn detail_filter(target: &DetailTarget) -> (String, Vec<Box<dyn ToSql>>) {
+    match target {
+        DetailTarget::Track { video_id } => (
+            "h.video_id = ?3".to_string(),
+            vec![Box::new(video_id.clone())],
+        ),
+        DetailTarget::Channel { channel_id } => match channel_id {
+            Some(id) => (
+                "h.channel_id = ?3".to_string(),
+                vec![Box::new(id.clone())],
+            ),
+            None => ("h.channel_id IS NULL".to_string(), Vec::new()),
+        },
+        DetailTarget::Playlist { playlist_id } => match playlist_id {
+            Some(id) => ("h.playlist_id = ?3".to_string(), vec![Box::new(*id)]),
+            None => ("h.playlist_id IS NULL".to_string(), Vec::new()),
+        },
+    }
+}
+
+fn detail_params<'a>(
+    from: &'a dyn ToSql,
+    to: &'a dyn ToSql,
+    extra: &'a [Box<dyn ToSql>],
+) -> Vec<&'a dyn ToSql> {
+    let mut all: Vec<&dyn ToSql> = vec![from, to];
+    all.extend(extra.iter().map(|value| value.as_ref()));
+    all
+}
+
+pub fn detail_summary(
+    conn: &Connection,
+    from: &str,
+    to: &str,
+    target: &DetailTarget,
+) -> Result<StatsSummary> {
+    let (filter, extra) = detail_filter(target);
+
+    let summary = conn.query_row(
+        &format!(
+            "SELECT COUNT(*) AS play_count,
+                    COALESCE(SUM(h.completed), 0) AS completed_count,
+                    COALESCE(SUM(h.listened_ms), 0) AS listened_ms,
+                    COUNT(DISTINCT h.video_id) AS unique_tracks,
+                    COUNT(DISTINCT {CHANNEL_COUNT_KEY}) AS unique_channels,
+                    COUNT(DISTINCT h.local_date) AS active_days
+             FROM play_history h
+             WHERE h.local_date BETWEEN ?1 AND ?2 AND {filter}"
+        ),
+        params_from_iter(detail_params(&from, &to, &extra)),
+        |row| {
+            Ok(StatsSummary {
+                play_count: row.get("play_count")?,
+                completed_count: row.get("completed_count")?,
+                listened_ms: row.get("listened_ms")?,
+                unique_tracks: row.get("unique_tracks")?,
+                unique_channels: row.get("unique_channels")?,
+                active_days: row.get("active_days")?,
+            })
+        },
+    )?;
+
+    Ok(summary)
+}
+
+pub fn detail_daily(
+    conn: &Connection,
+    from: &str,
+    to: &str,
+    target: &DetailTarget,
+) -> Result<Vec<DailyStat>> {
+    let (filter, extra) = detail_filter(target);
+
+    let mut stmt = conn.prepare(&format!(
+        "SELECT h.local_date AS date,
+                COUNT(*) AS play_count,
+                SUM(h.listened_ms) AS listened_ms
+         FROM play_history h
+         WHERE h.local_date BETWEEN ?1 AND ?2 AND {filter}
+         GROUP BY h.local_date
+         ORDER BY h.local_date"
+    ))?;
+    let rows = stmt.query_map(
+        params_from_iter(detail_params(&from, &to, &extra)),
+        row_to_daily,
+    )?;
+
+    Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
+pub fn detail_bounds(
+    conn: &Connection,
+    target: &DetailTarget,
+) -> Result<(Option<String>, Option<String>)> {
+    let (filter, extra) = detail_filter(target);
+    let filter = filter.replace("?3", "?1");
+    let params: Vec<&dyn ToSql> = extra.iter().map(|value| value.as_ref()).collect();
+
+    let bounds = conn.query_row(
+        &format!(
+            "SELECT MIN(h.started_at) AS first_played_at,
+                    MAX(h.started_at) AS last_played_at
+             FROM play_history h
+             WHERE {filter}"
+        ),
+        params_from_iter(params),
+        |row| Ok((row.get("first_played_at")?, row.get("last_played_at")?)),
+    )?;
+
+    Ok(bounds)
+}
+
+pub fn detail_top_tracks(
+    conn: &Connection,
+    from: &str,
+    to: &str,
+    target: &DetailTarget,
+    limit: usize,
+) -> Result<Vec<TrackStat>> {
+    let (filter, extra) = detail_filter(target);
+    let limit = limit as i64;
+    let mut params = detail_params(&from, &to, &extra);
+    params.push(&limit);
+
+    let mut stmt = conn.prepare(&format!(
+        "SELECT h.video_id AS video_id,
+                COALESCE(v.title, MAX(h.title)) AS title,
+                COALESCE(c.name, MAX(h.channel_name)) AS channel_name,
+                v.thumbnail AS thumbnail,
+                COUNT(*) AS play_count,
+                SUM(h.completed) AS completed_count,
+                SUM(h.listened_ms) AS listened_ms,
+                MAX(h.started_at) AS last_played_at
+         FROM play_history h
+         LEFT JOIN videos v ON v.id = h.video_id
+         LEFT JOIN channels c ON c.id = v.channel_id
+         WHERE h.local_date BETWEEN ?1 AND ?2 AND {filter}
+         GROUP BY h.video_id
+         ORDER BY {DEFAULT_ORDER}
+         LIMIT ?{}",
+        params.len()
+    ))?;
+    let rows = stmt.query_map(params_from_iter(params), row_to_track)?;
+
+    Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
+pub fn detail_identity(conn: &Connection, target: &DetailTarget) -> Result<DetailIdentity> {
+    match target {
+        DetailTarget::Track { video_id } => track_identity(conn, video_id),
+        DetailTarget::Channel { channel_id } => {
+            channel_identity(conn, channel_id.as_deref())
+        }
+        DetailTarget::Playlist { playlist_id } => playlist_identity(conn, *playlist_id),
+    }
+}
+
+fn track_identity(conn: &Connection, video_id: &str) -> Result<DetailIdentity> {
+    let live = conn
+        .query_row(
+            "SELECT v.title AS title,
+                    COALESCE(c.name, '') AS channel_name,
+                    v.thumbnail AS thumbnail,
+                    v.duration AS duration
+             FROM videos v
+             LEFT JOIN channels c ON c.id = v.channel_id
+             WHERE v.id = ?1",
+            params![video_id],
+            |row| {
+                Ok(DetailIdentity {
+                    title: row.get("title")?,
+                    subtitle: row.get::<_, String>("channel_name").map(|name| {
+                        if name.is_empty() {
+                            None
+                        } else {
+                            Some(name)
+                        }
+                    })?,
+                    image: row.get("thumbnail")?,
+                    present: true,
+                    duration_ms: row.get::<_, i64>("duration").map(|sec| Some(sec * 1000))?,
+                })
+            },
+        )
+        .optional()?;
+
+    if let Some(identity) = live {
+        return Ok(identity);
+    }
+
+    let historic = conn
+        .query_row(
+            "SELECT title, channel_name, duration_ms
+             FROM play_history
+             WHERE video_id = ?1
+             ORDER BY started_at DESC
+             LIMIT 1",
+            params![video_id],
+            |row| {
+                Ok(DetailIdentity {
+                    title: row.get("title")?,
+                    subtitle: row.get("channel_name")?,
+                    image: None,
+                    present: false,
+                    duration_ms: row.get("duration_ms")?,
+                })
+            },
+        )
+        .optional()?;
+
+    Ok(historic.unwrap_or_else(|| DetailIdentity {
+        title: video_id.to_string(),
+        subtitle: None,
+        image: None,
+        present: false,
+        duration_ms: None,
+    }))
+}
+
+fn channel_identity(conn: &Connection, channel_id: Option<&str>) -> Result<DetailIdentity> {
+    let Some(id) = channel_id else {
+        return Ok(DetailIdentity {
+            title: NO_CHANNEL_NAME.to_string(),
+            subtitle: None,
+            image: None,
+            present: true,
+            duration_ms: None,
+        });
+    };
+
+    let live = conn
+        .query_row(
+            "SELECT name, icon FROM channels WHERE id = ?1",
+            params![id],
+            |row| {
+                Ok(DetailIdentity {
+                    title: row.get("name")?,
+                    subtitle: None,
+                    image: row.get("icon")?,
+                    present: true,
+                    duration_ms: None,
+                })
+            },
+        )
+        .optional()?;
+
+    if let Some(identity) = live {
+        return Ok(identity);
+    }
+
+    let historic: Option<String> = conn
+        .query_row(
+            "SELECT channel_name
+             FROM play_history
+             WHERE channel_id = ?1
+             ORDER BY started_at DESC
+             LIMIT 1",
+            params![id],
+            |row| row.get(0),
+        )
+        .optional()?;
+
+    Ok(DetailIdentity {
+        title: historic.unwrap_or_else(|| id.to_string()),
+        subtitle: None,
+        image: None,
+        present: false,
+        duration_ms: None,
+    })
+}
+
+fn playlist_identity(conn: &Connection, playlist_id: Option<i64>) -> Result<DetailIdentity> {
+    let Some(id) = playlist_id else {
+        return Ok(DetailIdentity {
+            title: NO_PLAYLIST_NAME.to_string(),
+            subtitle: None,
+            image: None,
+            present: true,
+            duration_ms: None,
+        });
+    };
+
+    let live = conn
+        .query_row(
+            "SELECT name, thumbnail_url FROM playlists WHERE id = ?1",
+            params![id],
+            |row| {
+                Ok(DetailIdentity {
+                    title: row.get("name")?,
+                    subtitle: None,
+                    image: row.get("thumbnail_url")?,
+                    present: true,
+                    duration_ms: None,
+                })
+            },
+        )
+        .optional()?;
+
+    if let Some(identity) = live {
+        return Ok(identity);
+    }
+
+    let historic: Option<String> = conn
+        .query_row(
+            "SELECT playlist_name
+             FROM play_history
+             WHERE playlist_id = ?1 AND playlist_name IS NOT NULL
+             ORDER BY started_at DESC
+             LIMIT 1",
+            params![id],
+            |row| row.get(0),
+        )
+        .optional()?;
+
+    Ok(DetailIdentity {
+        title: historic.unwrap_or_else(|| NO_PLAYLIST_NAME.to_string()),
+        subtitle: None,
+        image: None,
+        present: false,
+        duration_ms: None,
+    })
 }
 
 pub fn ranked_total(conn: &Connection, from: &str, to: &str, kind: RankingKind) -> Result<i64> {

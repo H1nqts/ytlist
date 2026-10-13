@@ -1,7 +1,8 @@
 use tauri::State;
 
 use super::{
-    PlayRecord, RankingKind, RankingSort, StatsOverview, StatsRange, StatsRanking,
+    DetailTarget, PlayRecord, RankingKind, RankingSort, StatsDetail, StatsOverview, StatsRange,
+    StatsRanking,
 };
 use crate::state::AppState;
 
@@ -39,6 +40,19 @@ pub fn stats_ranking(
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     super::ranking(&conn, range, month.as_deref(), kind, sort, limit, offset)
         .inspect_err(|e| log::error!("failed to read a statistics ranking: {e:#}"))
+        .map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub fn stats_detail(
+    state: State<AppState>,
+    range: StatsRange,
+    month: Option<String>,
+    target: DetailTarget,
+) -> Result<StatsDetail, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    super::detail(&conn, range, month.as_deref(), &target)
+        .inspect_err(|e| log::error!("failed to read item statistics: {e:#}"))
         .map_err(|e| format!("{e:#}"))
 }
 

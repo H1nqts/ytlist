@@ -165,6 +165,37 @@ pub struct StatsOverview {
     pub available_months: Vec<String>,
 }
 
+#[derive(Deserialize, Debug, Clone)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub enum DetailTarget {
+    Track {
+        video_id: String,
+    },
+    Channel {
+        channel_id: Option<String>,
+    },
+    Playlist {
+        playlist_id: Option<i64>,
+    },
+}
+
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct StatsDetail {
+    pub title: String,
+    pub subtitle: Option<String>,
+    pub image: Option<String>,
+    pub present: bool,
+    pub summary: StatsSummary,
+    pub daily: Vec<DailyStat>,
+    /// The first and last play ever, not the ones inside the range.
+    pub first_played_at: Option<String>,
+    pub last_played_at: Option<String>,
+    pub duration_ms: Option<i64>,
+    /// Empty for a track.
+    pub top_tracks: Vec<TrackStat>,
+}
+
 /// Only the list named by `kind` is filled.
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -237,6 +268,35 @@ pub fn overview(
         daily: repo::daily(conn, &from, &to)?,
         playlists: repo::playlists(conn, &from, &to)?,
         available_months: repo::available_months(conn)?,
+    })
+}
+
+pub fn detail(
+    conn: &Connection,
+    range: StatsRange,
+    month: Option<&str>,
+    target: &DetailTarget,
+) -> Result<StatsDetail> {
+    let (from, to) = bounds(range, month);
+    let identity = repo::detail_identity(conn, target)?;
+    let (first_played_at, last_played_at) = repo::detail_bounds(conn, target)?;
+
+    let top_tracks = match target {
+        DetailTarget::Track { .. } => Vec::new(),
+        _ => repo::detail_top_tracks(conn, &from, &to, target, TOP_LIMIT)?,
+    };
+
+    Ok(StatsDetail {
+        title: identity.title,
+        subtitle: identity.subtitle,
+        image: identity.image,
+        present: identity.present,
+        summary: repo::detail_summary(conn, &from, &to, target)?,
+        daily: repo::detail_daily(conn, &from, &to, target)?,
+        first_played_at,
+        last_played_at,
+        duration_ms: identity.duration_ms,
+        top_tracks,
     })
 }
 

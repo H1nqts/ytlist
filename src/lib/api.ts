@@ -222,6 +222,26 @@ export interface StatsRanking {
   offset: number
 }
 
+export type DetailTarget =
+  | { kind: "track"; videoId: string }
+  | { kind: "channel"; channelId: string | null }
+  | { kind: "playlist"; playlistId: number | null }
+
+export interface StatsDetail {
+  title: string
+  subtitle: string | null
+  image: string | null
+  present: boolean
+  summary: StatsSummary
+  daily: DailyStat[]
+  /** The first and last play ever, not the ones inside the range. RFC3339. */
+  firstPlayedAt: string | null
+  lastPlayedAt: string | null
+  durationMs: number | null
+  /** Empty for a track. */
+  topTracks: TrackStat[]
+}
+
 export function statsRecord(record: PlayRecord): Promise<void> {
   return invoke<void>("stats_record", { record })
 }
@@ -248,6 +268,18 @@ export function statsRanking(
     sort,
     limit: limit ?? null,
     offset,
+  })
+}
+
+export function statsDetail(
+  range: StatsRange,
+  month: string | undefined,
+  target: DetailTarget
+): Promise<StatsDetail> {
+  return invoke<StatsDetail>("stats_detail", {
+    range,
+    month: month ?? null,
+    target,
   })
 }
 
