@@ -24,7 +24,7 @@ import {
 } from "@/components/stats/stats-ranking-row"
 import { StatsPager } from "@/components/stats/stats-pager"
 import { useStatsQuery } from "@/components/stats/use-stats-query"
-import type { StatsSubView } from "@/components/stats/stats-sub-view"
+import type { StatsDetailView } from "@/components/stats/stats-sub-view"
 
 const PAGE_SIZE = 50
 
@@ -70,9 +70,9 @@ interface StatsRankingPageProps {
   month: string | null
   reloads: number
   onLoadingChange: (loading: boolean) => void
-  /** Reports the sort and page back to the view stack, which holds them. */
-  onBrowse: (sort: RankingSort, offset: number) => void
-  onOpen: (sub: StatsSubView) => void
+  /** Reports the sort and page to the shell, which holds them per tab. */
+  onBrowse: (of: RankingKind, sort: RankingSort, offset: number) => void
+  onOpen: (detail: StatsDetailView) => void
 }
 
 export function StatsRankingPage({
@@ -89,12 +89,12 @@ export function StatsRankingPage({
   const { statsCleared } = useSettings()
 
   const setSort = React.useCallback(
-    (next: RankingSort) => onBrowse(next, 0),
-    [onBrowse]
+    (next: RankingSort) => onBrowse(of, next, 0),
+    [of, onBrowse]
   )
   const setOffset = React.useCallback(
-    (next: number) => onBrowse(sort, next),
-    [onBrowse, sort]
+    (next: number) => onBrowse(of, sort, next),
+    [of, onBrowse, sort]
   )
 
   const resetPage = React.useRef<() => void>(() => {})

@@ -17,7 +17,6 @@ import { useStatsQuery } from "@/components/stats/use-stats-query"
 import {
   toTarget,
   type StatsDetailView,
-  type StatsSubView,
 } from "@/components/stats/stats-sub-view"
 
 function plays(count: number): string {
@@ -30,7 +29,7 @@ interface StatsDetailPageProps {
   month: string | null
   reloads: number
   onLoadingChange: (loading: boolean) => void
-  onOpen: (sub: StatsSubView) => void
+  onOpen: (detail: StatsDetailView) => void
 }
 
 export function StatsDetailPage({

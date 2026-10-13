@@ -9,11 +9,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { StatsRangeFilter } from "@/components/stats/stats-range-filter"
-import { subViewTitle, type StatsSubView } from "@/components/stats/stats-sub-view"
 
 interface StatsHeaderProps {
-  sub: StatsSubView
-  parent: StatsSubView | null
+  title: string
+  /** The tab the detail view covers, or null on a tab itself. */
+  parentTitle: string | null
+  /** Tightens the bottom padding when the tab bar follows. */
+  tight?: boolean
   range: StatsRange
   month: string | null
   availableMonths: string[]
@@ -24,8 +26,9 @@ interface StatsHeaderProps {
 }
 
 export function StatsHeader({
-  sub,
-  parent,
+  title,
+  parentTitle,
+  tight,
   range,
   month,
   availableMonths,
@@ -34,10 +37,13 @@ export function StatsHeader({
   onBack,
   onRefresh,
 }: StatsHeaderProps) {
-  const parentTitle = parent && subViewTitle(parent)
-
   return (
-    <header className="flex flex-wrap items-center justify-between gap-3 px-6 pt-6 pb-3">
+    <header
+      className={cn(
+        "flex flex-wrap items-center justify-between gap-3 px-6 pt-6",
+        tight ? "pb-2" : "pb-3"
+      )}
+    >
       <div className="flex min-w-0 items-center gap-2">
         {parentTitle && (
           <Button
@@ -56,7 +62,7 @@ export function StatsHeader({
             </p>
           )}
           <h1 className="truncate font-heading text-2xl font-semibold">
-            {subViewTitle(sub)}
+            {title}
           </h1>
         </div>
       </div>

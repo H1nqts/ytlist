@@ -15,7 +15,10 @@ import { StatsDailyChart } from "@/components/stats/stats-daily-chart"
 import { StatsTopList, type TopEntry } from "@/components/stats/stats-top-list"
 import { StatsPlaylists } from "@/components/stats/stats-playlists"
 import { useStatsQuery } from "@/components/stats/use-stats-query"
-import { ranking, type StatsSubView } from "@/components/stats/stats-sub-view"
+import type {
+  StatsDetailView,
+  StatsTab,
+} from "@/components/stats/stats-sub-view"
 
 function plays(count: number): string {
   return `${count.toLocaleString()} ${count === 1 ? "play" : "plays"}`
@@ -27,7 +30,8 @@ interface StatsOverviewPageProps {
   reloads: number
   onMonths: (months: string[]) => void
   onLoadingChange: (loading: boolean) => void
-  onOpen: (sub: StatsSubView) => void
+  onOpen: (detail: StatsDetailView) => void
+  onSeeAll: (tab: StatsTab) => void
 }
 
 export function StatsOverviewPage({
@@ -37,6 +41,7 @@ export function StatsOverviewPage({
   onMonths,
   onLoadingChange,
   onOpen,
+  onSeeAll,
 }: StatsOverviewPageProps) {
   const { statsEnabled, statsCleared } = useSettings()
 
@@ -142,7 +147,7 @@ export function StatsOverviewPage({
       <EmptyState
         icon={ChartColumnIcon}
         title="Couldn't load your statistics"
-        description="Settings › Logs has the details."
+        description="Settings ??Logs has the details."
         className="py-16"
       />
     )
@@ -189,21 +194,21 @@ export function StatsOverviewPage({
           heading="Top tracks"
           entries={trackEntries}
           emptyLabel="Nothing yet."
-          onSeeAll={() => onOpen(ranking("tracks"))}
+          onSeeAll={() => onSeeAll("tracks")}
           onSelect={onSelectTrack}
         />
         <StatsTopList
           heading="Top channels"
           entries={channelEntries}
           emptyLabel="Nothing yet."
-          onSeeAll={() => onOpen(ranking("channels"))}
+          onSeeAll={() => onSeeAll("channels")}
           onSelect={onSelectChannel}
         />
       </div>
 
       <StatsPlaylists
         playlists={data.playlists}
-        onSeeAll={() => onOpen(ranking("playlists"))}
+        onSeeAll={() => onSeeAll("playlists")}
         onSelect={onSelectPlaylist}
       />
     </div>
