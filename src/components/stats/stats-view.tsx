@@ -8,6 +8,7 @@ import { StatsTabs } from "@/components/stats/stats-tabs"
 import { StatsOverviewPage } from "@/components/stats/stats-overview-page"
 import { StatsRankingPage } from "@/components/stats/stats-ranking-page"
 import { StatsDetailPage } from "@/components/stats/stats-detail-page"
+import { StatsPatternsPage } from "@/components/stats/stats-patterns-page"
 import {
   detailTitle,
   isRanking,
@@ -138,6 +139,13 @@ export function StatsView() {
             onLoadingChange={setLoading}
             onOpen={onOpen}
             onSeeAll={setTab}
+          />
+        ) : tab === "patterns" ? (
+          <StatsPatternsPage
+            range={range}
+            month={month}
+            reloads={reloads}
+            onLoadingChange={setLoading}
           />
         ) : isRanking(tab) ? (
           <StatsRankingPage

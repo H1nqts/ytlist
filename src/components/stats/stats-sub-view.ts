@@ -1,6 +1,6 @@
 import type { DetailTarget, RankingKind, RankingSort } from "@/lib/api"
 
-export type StatsTab = "overview" | RankingKind
+export type StatsTab = "overview" | RankingKind | "patterns"
 
 /** A tab's own state, kept while the detail view covers it. */
 export interface RankingTabState {
@@ -19,6 +19,7 @@ export const TABS: { value: StatsTab; label: string }[] = [
   { value: "tracks", label: "Tracks" },
   { value: "channels", label: "Channels" },
   { value: "playlists", label: "Playlists" },
+  { value: "patterns", label: "Patterns" },
 ]
 
 const TAB_TITLES: Record<StatsTab, string> = {
@@ -26,6 +27,7 @@ const TAB_TITLES: Record<StatsTab, string> = {
   tracks: "Top tracks",
   channels: "Top channels",
   playlists: "By playlist",
+  patterns: "Listening patterns",
 }
 
 export function tabTitle(tab: StatsTab): string {

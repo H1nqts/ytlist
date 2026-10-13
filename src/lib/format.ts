@@ -58,6 +58,21 @@ export function formatShortDate(date: string): string {
   })
 }
 
+/** 0 -> "12 AM", 9 -> "9 AM", 13 -> "1 PM" */
+export function formatHour(hour: number): string {
+  const h = ((hour % 24) + 24) % 24
+  const suffix = h < 12 ? "AM" : "PM"
+  const display = h % 12 === 0 ? 12 : h % 12
+  return `${display} ${suffix}`
+}
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
+/** 0 -> "Sun", matching local_weekday */
+export function formatWeekday(weekday: number): string {
+  return WEEKDAYS[((weekday % 7) + 7) % 7]
+}
+
 /** "2026-09" -> "September 2026" */
 export function formatMonth(month: string): string {
   const [y, m] = month.split("-").map(Number)
